@@ -1,0 +1,68 @@
+{
+  "algorithm": {
+    "flags":{
+      "clear_ancillary_data": true
+    },
+    "system":{
+      "cdo_path": "/home/fp/library/fp_apps_system/cdo-1.9.8_nc-4.6.0_hdf-1.8.17_eccodes-2.17.0/bin/",
+      "grib_copy_path" : "/home/fp/library/fp_libs_system/eccodes2.23.0/bin/"
+    },
+    "general": {
+      "title": "Downloader GLOFAS",
+      "web-site": "",
+      "source": "Python library developed by CIMA Research Foundation",
+      "history": "1.0.0 [20210812]",
+      "project-info": "bulletin",
+      "algorithm": "Postprocessing tool developed by CIMA Research Foundation"
+    },
+    "template": {
+      "ancillary_sub_path_time": "%Y/%m/%d/",
+      "ancillary_datetime": "%Y%m%d%H%M",
+      "outcome_sub_path_time": "%Y/%m/%d/",
+      "outcome_datetime": "%Y%m%d%H%M"
+    }
+  },
+  "data": {
+    "static": {
+      "warning_regions": "/home/fp/share/fp_africa/data/data_static/shapefile/ne_10m_admin_0_countries.shp",
+      "area": "/home/fp/share/fp_africa/data/data_static/raster/glofas/ups.tif",
+      "discharge_thresholds":{
+        "folder": "/home/fp/share/fp_africa/data/data_static/raster/glofas/",
+        "file_name": "th{return_period}.tif",
+        "return_periods": [2,5,20]
+      }
+    },
+    "dynamic": {
+      "glofas": {
+        "time_steps": ["24","48","72","96","120"],
+        "ens_max": 51
+      },
+      "bbox" : {
+        "lat_north": 40.05,
+        "lon_west" : -19.95,
+        "lat_south": -34.95,
+        "lon_east": 52.05
+      },
+      "thresholds": {
+        "area_km2": 1000,
+        "discharge_min": 10,
+        "min_warning_pixel": 3
+      },
+      "ancillary": {
+        "file_name": "glofas_fc_{ancillary_datetime}.grib",
+        "folder": "/home/fp/share/fp_africa/data/data_dynamic/ancillary/hydro/glofas/{ancillary_sub_path_time}"
+      },
+      "outcome": {
+        "file_name": "flood_hazard_levels_glofas_{outcome_datetime}.tif",
+        "file_name_resume": "{outcome_datetime}_FLOODGLOFAS.shp",
+        "folder": "/home/fp/share/fp_africa/data/data_dynamic/outcome/hydro/{outcome_sub_path_time}/0000/glofas/",
+        "folder_resume": "/home/fp/share/fp_africa/data/data_dynamic/outcome/hydro/{outcome_sub_path_time}/"
+      }
+    },
+    "log": {
+      "filename": "fp_bulletin_hydro_GLOFAS_warning.txt",
+      "folder": "/home/fp/share/fp_africa/log/"
+    }
+  }
+}
+
