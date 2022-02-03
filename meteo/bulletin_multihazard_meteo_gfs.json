@@ -3,7 +3,9 @@
     "flags":{
       "clear_ancillary_data": true,
       "mask_sea": true,
-      "debug_mode": false
+      "debug_mode": true,
+      "hazard_assessment": false,
+      "impact_assessment": true
     },
     "general": {
       "title": "Multihazard warning for Dewetra",
@@ -21,19 +23,19 @@
       "hmc_datetime_folder": "%Y/%m/%d/%H"
     },
     "settings": {
-      "download_forecast_with_drops": true,
-      "use_local_forecast_file": false,
+      "download_forecast_with_drops": false,
+      "use_local_forecast_file": true,
       "min_warning_pixel": 0
     }
   },
   "data": {
     "static": {
-      "warning_regions": "/home/fp/share/fp_africa/data/data_static/shapefile/ne_10m_admin_0_countries.shp",
-      "sea_mask": "/home/fp/share/fp_africa/data/data_static/raster/mask_sea.tif",
+      "warning_regions": "/home/andrea/CIMA/PROJECT_IGAD2/bulletin/shp/ne_10m_admin_0_countries.shp",
+      "sea_mask": "/home/andrea/CIMA/PROJECT_IGAD2/bulletin/raster/mask_sea.tif",
       "rain_thresholds":{
-        "folder": "/home/fp/share/fp_africa/data/data_static/thresholds/rain/",
-        "file_name": "Quantiles_24h_{quantile}.tif",
-        "quantiles": [99,99.5,99.8],
+        "folder": "/home/andrea/CIMA/PROJECT_IGAD2/bulletin/Rainfall_thresholds_24h_CHIRPS_GEV/filled/",
+        "file_name": "Q_{quantile}_filled.tif",
+        "quantiles": [50,80,95],
         "limits": [[40,60],[70,100],[100,120]]
       },
       "wind_thresholds": {
@@ -62,34 +64,44 @@
         "rain": {
           "name": "Total_precipitation_surface_Mixed_intervals_Accumulation",
           "level": "-",
-          "date_selected": "all"
+          "date_selected": "all",
+          "file":"/home/andrea/CIMA/DEVELOPEMENT/bulletin_impact/ancillary/nwp/gfs025/{outcome_sub_path_time}/forecast.nc"
         },
         "u-wind": {
           "name": "u-component_of_wind_height_above_ground",
           "level": 10.0,
-          "date_selected": "all"
+          "date_selected": "all",
+          "file":"/home/andrea/CIMA/DEVELOPEMENT/bulletin_impact/ancillary/nwp/gfs025/{outcome_sub_path_time}/forecast.nc"
         },
         "v-wind": {
           "name": "v-component_of_wind_height_above_ground",
           "level": 10.0,
-          "date_selected": "all"
+          "date_selected": "all",
+          "file":"/home/andrea/CIMA/DEVELOPEMENT/bulletin_impact/ancillary/nwp/gfs025/{outcome_sub_path_time}/forecast.nc"
         }
       },
       "ancillary": {
         "file_name": "gfs025_{ancillary_datetime}_max.nc",
-        "folder": "/home/fp/share/fp_africa/data/data_dynamic/ancillary/nwp/gfs025/{ancillary_sub_path_time}"
+        "folder": "/home/andrea/CIMA/DEVELOPEMENT/bulletin_impact/ancillary/nwp/gfs025/{ancillary_sub_path_time}"
       },
       "outcome": {
         "file_name": "multihazard_levels_{outcome_datetime}.nc",
-        "file_name_resume": "{outcome_datetime}.shp",
-        "folder": "/home/fp/share/fp_africa/data/data_dynamic/outcome/nwp/gfs025/{outcome_sub_path_time}/0000/",
-        "folder_resume": "/home/fp/share/fp_africa/data/data_dynamic/outcome/nwp/gfs025/{outcome_sub_path_time}"
-
+        "file_name_shape_hazard": "{outcome_datetime}.shp",
+        "file_name_shape_impacts": "{outcome_datetime}_impacts.shp",
+        "folder": "/home/andrea/CIMA/DEVELOPEMENT/bulletin_impact/outcome/nwp/gfs025/{outcome_sub_path_time}/0000/",
+        "folder_shape_hazard": "/home/andrea/CIMA/DEVELOPEMENT/bulletin_impact/outcome/nwp/gfs025/{outcome_sub_path_time}",
+        "folder_shape_impacts": "/home/andrea/CIMA/DEVELOPEMENT/bulletin_impact/outcome/nwp/gfs025/{outcome_sub_path_time}"
       }
+    },
+    "impacts": {
+      "lack_coping_capacity_col": "LACK_CC",
+      "exposed_population_map": "/home/andrea/CIMA/PROJECT_IGAD2/bulletin/GHS_POP_E2015_AFRICA_R2019A_4326_9ss_V1_0.tif",
+      "weight_hazard_levels": [0.5,0.8,0.95],
+      "risk_thresholds": [0.000001,0.00001,0.05,0.4]
     },
     "log": {
       "filename": "fp_africa_warning.txt",
-      "folder": "/home/fp/share/fp_africa/log/"
+      "folder": "/home/andrea/CIMA/DEVELOPEMENT/bulletin_impact/log/"
     }
   }
 }
