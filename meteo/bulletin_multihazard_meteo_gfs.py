@@ -1,13 +1,14 @@
 """
 bulletin - meteo multihazard - GFS025
-__date__ = '20211111'
-__version__ = '1.1.0'
+__date__ = '20220202'
+__version__ = '1.2.0'
 __author__ =
         'Andrea Libertino (andrea.libertino@cimafoundation.org',
 __library__ = 'bulletin'
 General command line:
 ### python fp_bulletin_hydro_glofas.py -settings_file "settings.json" -time "YYYY-MM-DD HH:MM"
 Version(s):
+20220202 (1.2.0) --> Add impact assessment
 20211111 (1.1.0) --> Separate hydro components
                      Add backup procedure
 20200326 (1.0.0) --> Beta release for FloodProofs Africa
@@ -31,8 +32,8 @@ from affine import Affine
 import warnings
 import glob
 import rasterio as rio
+import rioxarray as rx
 import sys
-
 
 # -------------------------------------------------------------------------------------
 # Script Main
@@ -77,13 +78,20 @@ def main():
     output_file = os.path.join(output_folder, data_settings['data']['dynamic']['outcome']['file_name']).format(
         **template_time_step)
 
-    output_folder_resume = data_settings['data']['dynamic']['outcome']['folder_resume'].format(**template_time_step)
-    output_file_resume = os.path.join(output_folder_resume,
-                                      data_settings['data']['dynamic']['outcome']['file_name_resume']).format(
+    output_folder_shape_hazard = data_settings['data']['dynamic']['outcome']['folder_shape_hazard'].format(
         **template_time_step)
+    output_file_shape_hazard = os.path.join(output_folder_shape_hazard,
+                                            data_settings['data']['dynamic']['outcome'][
+                                                'file_name_shape_hazard']).format(**template_time_step)
 
+    output_folder_shape_impacts = data_settings['data']['dynamic']['outcome']['folder_shape_impacts'].format(
+        **template_time_step)
+    output_file_shape_impacts = os.path.join(output_folder_shape_impacts,
+                                            data_settings['data']['dynamic']['outcome'][
+                                                'file_name_shape_impacts']).format(**template_time_step)
     os.makedirs(output_folder, exist_ok=True)
-    os.makedirs(output_folder_resume, exist_ok=True)
+    os.makedirs(output_folder_shape_impacts, exist_ok=True)
+    os.makedirs(output_folder_shape_hazard, exist_ok=True)
     os.makedirs(ancillary_folder, exist_ok=True)
     # -------------------------------------------------------------------------------------
     # Info algorithm
@@ -120,7 +128,6 @@ def main():
         logging.error("ERROR! Select if download forecast with drops2 or use local forecast!")
         raise ValueError
 
-    # -------------------------------------------------------------------------------------
     # Download with drops
     elif data_settings["algorithm"]["settings"]["download_forecast_with_drops"]:
         # Connect to drops2 for downloading data
@@ -196,7 +203,6 @@ def main():
     # -------------------------------------------------------------------------------------
     # Use local file
     elif data_settings["algorithm"]["settings"]["use_local_forecast_file"]:
-
         date_ref = deepcopy(date_run)
         forecast_end = date_ref + timedelta(hours=data_settings['data']['dynamic']['time']['forecast_length_h'] - 1)
 
@@ -335,61 +341,31 @@ def main():
     # -------------------------------------------------------------------------------------
 
     # -------------------------------------------------------------------------------------
-    # Calculate max alert level for meteorological hazards
+    if data_settings["algorithm"]["flags"]["hazard_assessment"]:
+        logging.info(" --> Classify meteo country warning level based on hazard...")
+        shp_fo = data_settings["data"]["static"]["warning_regions"]
+        shp_df = gpd.read_file(shp_fo)
+        shp_df_step = classify_warning_levels_pure_hazard(shp_df, alert_daily,
+                                            data_settings["algorithm"]["settings"]["min_warning_pixel"])
+        shp_df_step.drop(columns="rain_level").to_file(output_file_shape_hazard.replace(".shp", "_WIND.shp"))
+        shp_df_step.drop(columns="wind_level").to_file(output_file_shape_hazard.replace(".shp", "_RAIN.shp"))
+        logging.info(" --> Classify meteo country warning level based on hazard...DONE")
 
-    logging.info(" --> Classify meteo country warning level...")
+    if data_settings["algorithm"]["flags"]["impact_assessment"]:
+        logging.info(" --> Classify meteo country warning level based on impacts...")
+        shp_fo = data_settings["data"]["static"]["warning_regions"]
+        shp_df = gpd.read_file(shp_fo)
+        shp_df_step = classify_warning_levels_impact_based(shp_df, alert_daily, data_settings["data"]["impacts"])
+        shp_df_step.drop(columns="rain_level").to_file(output_file_shape_impacts.replace(".shp", "_WIND.shp"))
+        shp_df_step.drop(columns="wind_level").to_file(output_file_shape_impacts.replace(".shp", "_RAIN.shp"))
+        logging.info(" --> Classify meteo country warning level based on impacts...DONE")
 
-    shp_fo = data_settings["data"]["static"]["warning_regions"]
-    shp_df = gpd.read_file(shp_fo)
-
-    shapes = [(shape, n) for n, shape in enumerate(shp_df.geometry)]
-    ds = xr.Dataset(coords={'lon': alert_daily['lon'].values,
-                            'lat': alert_daily['lat'].values})
-    ds['states'] = rasterize(shapes, ds.coords)
-
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore", category=RuntimeWarning)
-        shp_df_step = deepcopy(shp_df)
-        rain_step = alert_daily["rain"]
-        wind_step = alert_daily["wind"]
-        logging.info(" ---> Loop through the alert zones...")         
-            
-        for index, row in shp_df_step.iterrows():
-            # Rain
-            val_max = np.nanmax(rain_step.where(ds['states'] == index))
-            while val_max > 1:
-                tot_over = np.count_nonzero(rain_step.where(ds['states'] == index) >= val_max)
-                if tot_over >= data_settings["algorithm"]["settings"]["min_warning_pixel"]:
-                    break
-                else:
-                    val_max = val_max - 1
-            shp_df_step.at[index, "rain_level"] = val_max
-            
-            # Wind
-            val_max = np.nanmax(wind_step.where(ds['states'] == index))
-            while val_max > 1:
-                tot_over = np.count_nonzero(wind_step.where(ds['states'] == index) >= val_max)
-                if tot_over >= data_settings["algorithm"]["settings"]["min_warning_pixel"]:
-                    break
-                else:
-                    val_max = val_max - 1
-            shp_df_step.at[index, "wind_level"] = val_max
-            
-        logging.info(" ---> Loop through the alert zones...DONE")
-
-        shp_df_step['rain_level'] = shp_df_step['rain_level'].fillna(-9999)
-        shp_df_step['wind_level'] = shp_df_step['wind_level'].fillna(-9999)
-
-    logging.info(" --> Classify country warning level...DONE")
     # -------------------------------------------------------------------------------------
 
     # -------------------------------------------------------------------------------------
     # Write output and clean
     logging.info(" --> Write output...")
     alert_daily.to_netcdf(output_file)
-
-    shp_df_step.drop(columns="rain_level").to_file(output_file_resume.replace(".shp", "_WIND.shp"))
-    shp_df_step.drop(columns="wind_level").to_file(output_file_resume.replace(".shp", "_RAIN.shp"))
 
     if data_settings["algorithm"]["flags"]["clear_ancillary_data"]:
         os.system("rm " + ancillary_file)
@@ -562,6 +538,93 @@ def write_tif(out_name, Z, transform, flip_lat=True, proj='epsg:4326', no_data=-
         dst.write(Z, 1)
 
 
+# ----------------------------------------------------------------------------
+# Classify a shapefile of countries with an alert level map with a pure-hazard approach
+def classify_warning_levels_pure_hazard(shp_df, alert_daily, min_warning_treshold=1):
+    shapes = [(shape, n) for n, shape in enumerate(shp_df.geometry)]
+    ds = xr.Dataset(coords={'lon': alert_daily['lon'].values,
+                            'lat': alert_daily['lat'].values})
+    ds['states'] = rasterize(shapes, ds.coords)
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", category=RuntimeWarning)
+        shp_df_step = deepcopy(shp_df)
+        rain_step = alert_daily["rain"]
+        wind_step = alert_daily["wind"]
+        logging.info(" ---> Loop through the alert zones...")
+
+        for index, row in shp_df_step.iterrows():
+            # Rain
+            val_max = np.nanmax(rain_step.where(ds['states'] == index))
+            while val_max > 1:
+                tot_over = np.count_nonzero(rain_step.where(ds['states'] == index) >= val_max)
+                if tot_over >= min_warning_treshold:
+                    break
+                else:
+                    val_max = val_max - 1
+            shp_df_step.at[index, "rain_level"] = val_max
+
+            # Wind
+            val_max = np.nanmax(wind_step.where(ds['states'] == index))
+            while val_max > 1:
+                tot_over = np.count_nonzero(wind_step.where(ds['states'] == index) >= val_max)
+                if tot_over >= min_warning_treshold:
+                    break
+                else:
+                    val_max = val_max - 1
+            shp_df_step.at[index, "wind_level"] = val_max
+
+        logging.info(" ---> Loop through the alert zones...DONE")
+
+        shp_df_step['rain_level'] = shp_df_step['rain_level'].fillna(-9999)
+        shp_df_step['wind_level'] = shp_df_step['wind_level'].fillna(-9999)
+
+    return shp_df_step
+# ----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
+# Classify a shapefile of countries with an alert level map with an impact-based approach
+def classify_warning_levels_impact_based(shp_df, alert_daily, impact_dict):
+    alert_daily_max = alert_daily.max(dim='time')
+    hazards = ["wind","rain"]
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", category=RuntimeWarning)
+        shp_df_step = deepcopy(shp_df)
+
+        logging.info(" ---> Loop through the alert zones...")
+
+        for index, row in shp_df_step.iterrows():
+            logging.info(" ----> Computing zone " + str(index +1) + " of " + str(len(shp_df_step)))
+            bbox = row["geometry"].bounds
+            clipped_pop = rx.open_rasterio(impact_dict["exposed_population_map"]).rio.clip_box(minx=bbox[0],miny=bbox[1],maxx=bbox[2],maxy=bbox[3])
+            clipped_pop.values[clipped_pop.values<0] = 0
+            lon_bbox = clipped_pop.x.values
+            lat_bbox = clipped_pop.y.values
+            alert_bbox = alert_daily_max.reindex({"lon":lon_bbox, "lat":lat_bbox}, method="nearest")
+            country_bbox = rasterize([(row['geometry'], index+1)], {"lon":lon_bbox, "lat":lat_bbox})
+
+            for hazard in hazards:
+                weigth_map = np.where(country_bbox==index+1,0,np.nan)
+                for lev, weigth in enumerate(impact_dict["weight_hazard_levels"], start=2):
+                    weigth_map = np.where(alert_bbox[hazard].values==lev,weigth,weigth_map)
+                impact = np.nansum(
+                    weigth_map * np.squeeze(clipped_pop.values) * (row[impact_dict["lack_coping_capacity_col"]] / 10)) / np.nansum(
+                    np.where(country_bbox == index + 1, np.squeeze(clipped_pop.values), np.nan))
+                risk = 0
+                for risk_lev, risk_th in enumerate(impact_dict["risk_thresholds"], start=1):
+                    if impact >= risk_th:
+                        risk = risk_lev
+                    else:
+                        break
+                shp_df_step.at[index, hazard + "_level"] = risk
+
+        logging.info(" ---> Loop through the alert zones...DONE")
+
+        for hazard in hazards:
+            shp_df_step[hazard + '_level'] = shp_df_step[hazard + '_level'].fillna(-9999)
+
+    return shp_df_step
 # ----------------------------------------------------------------------------
 
 # ----------------------------------------------------------------------------
