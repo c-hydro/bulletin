@@ -73,6 +73,7 @@ def main():
     ancillary_folder = data_settings['data']['dynamic']['ancillary']['folder'].format(**template_time_step)
     ancillary_file = os.path.join(ancillary_folder, data_settings['data']['dynamic']['ancillary']['file_name']).format(
         **template_time_step)
+    ancillary_frc_file = os.path.join(ancillary_folder, "forecast.nc")
 
     output_folder = data_settings['data']['dynamic']['outcome']['folder'].format(**template_time_step)
     output_file = os.path.join(output_folder, data_settings['data']['dynamic']['outcome']['file_name']).format(
@@ -113,6 +114,9 @@ def main():
         logging.info(" --> Debug mode : ACTIVE")
     else:
         logging.info(" --> Debug mode : NOT ACTIVE")
+
+    # Flag to verify if the local data derive from a previous run of this procedure (not overwrite temp file)
+    check_previous_dload = False
     # -------------------------------------------------------------------------------------
 
     # -------------------------------------------------------------------------------------
@@ -207,15 +211,20 @@ def main():
         forecast_end = date_ref + timedelta(hours=data_settings['data']['dynamic']['time']['forecast_length_h'] - 1)
 
         for type, variable in zip(data_settings['data']['dynamic']['variables'].keys(), variable_names):
-            logging.info(" ---> Download variable: " + type + "...")
+            logging.info(" ---> Import local variable: " + type + "...")
             logging.info(" ----> Variable name: " + variable)
 
             data_drops = xr.open_dataset(data_settings['data']['dynamic']['variables'][type]["file"].format(
         **template_time_step))
+            if data_drops == ancillary_frc_file:
+                check_previous_dload = True
             data_lon = np.unique(data_drops.lon.values)
-            data_lat = np.unique(data_drops.lat.values)[::-1]
+            if data_drops.lat.values[-1] < data_drops.lat.values[1]:
+                data_lat = np.unique(data_drops.lat.values)[::-1]
+            else:
+                data_lat = np.unique(data_drops.lat.values)
 
-            if variable == '10v' or variable == '10u':
+            if variable == '10v' or variable == '10u' and len(data.shape)==4:
                 data = data_drops[variable].loc[:, 10.0, :, :].values
             else:
                 data = data_drops[variable].values
@@ -223,7 +232,7 @@ def main():
             variables_dic[type] = xr.DataArray(dims=["time", "lat", "lon"],
                                                coords={"lon": data_lon, "lat": data_lat,
                                                        "time": data_drops.time.values}, data=data)
-            logging.info(" ----> Get data from drops2...DONE")
+            logging.info(" ----> Get local data...DONE")
             logging.info(" ---> Download variable: " + type + "...DONE")
 
         logging.info(" ---> Use of local available forecast...DONE")
@@ -235,9 +244,8 @@ def main():
 
     data = xr.Dataset(variables_dic)
 
-    if debug_mode:
-        temp_debug = os.path.join(ancillary_folder, "forecast.nc")
-        data.to_netcdf(temp_debug)
+    if debug_mode and not check_previous_dload:
+            data.to_netcdf(ancillary_frc_file)
 
     logging.info(" ---> Crop forecast over domain...")
     min_lon = data_settings["data"]["dynamic"]["bbox"]['lon_left']
@@ -341,23 +349,29 @@ def main():
     # -------------------------------------------------------------------------------------
 
     # -------------------------------------------------------------------------------------
+    # Assign hazard and impact levels
+    hazards = data_settings["algorithm"]["settings"]["hazards"]
+
     if data_settings["algorithm"]["flags"]["hazard_assessment"]:
         logging.info(" --> Classify meteo country warning level based on hazard...")
         shp_fo = data_settings["data"]["static"]["warning_regions"]
         shp_df = gpd.read_file(shp_fo)
-        shp_df_step = classify_warning_levels_pure_hazard(shp_df, alert_daily,
-                                            data_settings["algorithm"]["settings"]["min_warning_pixel"])
-        shp_df_step.drop(columns="rain_level").to_file(output_file_shape_hazard.replace(".shp", "_WIND.shp"))
-        shp_df_step.drop(columns="wind_level").to_file(output_file_shape_hazard.replace(".shp", "_RAIN.shp"))
+        for hazard in hazards:
+            classify_warning_levels_pure_hazard(hazard,
+                                                output_file_shape_hazard.format(HAZARD=hazard.upper(), hazard=hazard),
+                                                shp_df, alert_daily,
+                                                data_settings["algorithm"]["settings"]["min_warning_pixel"])
         logging.info(" --> Classify meteo country warning level based on hazard...DONE")
 
     if data_settings["algorithm"]["flags"]["impact_assessment"]:
         logging.info(" --> Classify meteo country warning level based on impacts...")
         shp_fo = data_settings["data"]["static"]["warning_regions"]
         shp_df = gpd.read_file(shp_fo)
-        shp_df_step = classify_warning_levels_impact_based(shp_df, alert_daily, data_settings["data"]["impacts"])
-        shp_df_step.drop(columns="rain_level").to_file(output_file_shape_impacts.replace(".shp", "_WIND.shp"))
-        shp_df_step.drop(columns="wind_level").to_file(output_file_shape_impacts.replace(".shp", "_RAIN.shp"))
+        for hazard in hazards:
+            classify_warning_levels_impact_based(hazard,
+                                                output_file_shape_impacts.format(HAZARD=hazard.upper(), hazard=hazard),
+                                                shp_df, alert_daily,
+                                                data_settings["data"]["impacts"])
         logging.info(" --> Classify meteo country warning level based on impacts...DONE")
 
     # -------------------------------------------------------------------------------------
@@ -514,7 +528,6 @@ def rasterize(shapes, coords, fill=np.nan, **kwargs):
                                 dtype=float, **kwargs)
     return xr.DataArray(raster, coords=coords, dims=('lat', 'lon'))
 
-
 # ----------------------------------------------------------------------------
 
 # ----------------------------------------------------------------------------
@@ -540,7 +553,7 @@ def write_tif(out_name, Z, transform, flip_lat=True, proj='epsg:4326', no_data=-
 
 # ----------------------------------------------------------------------------
 # Classify a shapefile of countries with an alert level map with a pure-hazard approach
-def classify_warning_levels_pure_hazard(shp_df, alert_daily, min_warning_treshold=1):
+def classify_warning_levels_pure_hazard(hazard, out_name, shp_df, alert_daily, min_warning_treshold=1):
     shapes = [(shape, n) for n, shape in enumerate(shp_df.geometry)]
     ds = xr.Dataset(coords={'lon': alert_daily['lon'].values,
                             'lat': alert_daily['lat'].values})
@@ -549,50 +562,45 @@ def classify_warning_levels_pure_hazard(shp_df, alert_daily, min_warning_treshol
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", category=RuntimeWarning)
         shp_df_step = deepcopy(shp_df)
-        rain_step = alert_daily["rain"]
-        wind_step = alert_daily["wind"]
-        logging.info(" ---> Loop through the alert zones...")
+        shp_df_step[hazard + "_level"] = -9999.0
+
+        alert_step = alert_daily[hazard]
+        logging.info(" ---> Loop through the alert zones for " + hazard + " risk...")
 
         for index, row in shp_df_step.iterrows():
             # Rain
-            val_max = np.nanmax(rain_step.where(ds['states'] == index))
+            val_max = np.nanmax(alert_step.where(ds['states'] == index))
             while val_max > 1:
-                tot_over = np.count_nonzero(rain_step.where(ds['states'] == index) >= val_max)
+                tot_over = np.count_nonzero(alert_step.where(ds['states'] == index) >= val_max)
                 if tot_over >= min_warning_treshold:
                     break
                 else:
                     val_max = val_max - 1
-            shp_df_step.at[index, "rain_level"] = val_max
-
-            # Wind
-            val_max = np.nanmax(wind_step.where(ds['states'] == index))
-            while val_max > 1:
-                tot_over = np.count_nonzero(wind_step.where(ds['states'] == index) >= val_max)
-                if tot_over >= min_warning_treshold:
-                    break
-                else:
-                    val_max = val_max - 1
-            shp_df_step.at[index, "wind_level"] = val_max
+            shp_df_step.at[index, hazard + "_level"] = val_max
 
         logging.info(" ---> Loop through the alert zones...DONE")
 
-        shp_df_step['rain_level'] = shp_df_step['rain_level'].fillna(-9999)
-        shp_df_step['wind_level'] = shp_df_step['wind_level'].fillna(-9999)
+        logging.info(" ---> Save shapefile for " + hazard + " risk...")
+        shp_df_step.to_file(out_name)
+        logging.info(" ---> Save shapefile for " + hazard + " risk...DONE")
 
-    return shp_df_step
 # ----------------------------------------------------------------------------
 
 # ----------------------------------------------------------------------------
 # Classify a shapefile of countries with an alert level map with an impact-based approach
-def classify_warning_levels_impact_based(shp_df, alert_daily, impact_dict):
+def classify_warning_levels_impact_based(hazard, out_name, shp_df, alert_daily, impact_dict):
     alert_daily_max = alert_daily.max(dim='time')
-    hazards = ["wind","rain"]
 
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", category=RuntimeWarning)
         shp_df_step = deepcopy(shp_df)
 
-        logging.info(" ---> Loop through the alert zones...")
+        shp_df_step["pop_total"] = -9999.0
+        shp_df_step[hazard + "AffPpl"] = -9999.0
+        shp_df_step[hazard + "AffPrc"] = -9999.0
+        shp_df_step[hazard + "_level"] = -9999.0
+
+        logging.info(" ---> Loop through the alert zones for " + hazard + " risk...")
 
         for index, row in shp_df_step.iterrows():
             logging.info(" ----> Computing zone " + str(index +1) + " of " + str(len(shp_df_step)))
@@ -604,27 +612,31 @@ def classify_warning_levels_impact_based(shp_df, alert_daily, impact_dict):
             alert_bbox = alert_daily_max.reindex({"lon":lon_bbox, "lat":lat_bbox}, method="nearest")
             country_bbox = rasterize([(row['geometry'], index+1)], {"lon":lon_bbox, "lat":lat_bbox})
 
-            for hazard in hazards:
-                weigth_map = np.where(country_bbox==index+1,0,np.nan)
-                for lev, weigth in enumerate(impact_dict["weight_hazard_levels"], start=2):
-                    weigth_map = np.where(alert_bbox[hazard].values==lev,weigth,weigth_map)
-                impact = np.nansum(
-                    weigth_map * np.squeeze(clipped_pop.values) * (row[impact_dict["lack_coping_capacity_col"]] / 10)) / np.nansum(
-                    np.where(country_bbox == index + 1, np.squeeze(clipped_pop.values), np.nan))
-                risk = 0
-                for risk_lev, risk_th in enumerate(impact_dict["risk_thresholds"], start=1):
-                    if impact >= risk_th:
-                        risk = risk_lev
-                    else:
-                        break
-                shp_df_step.at[index, hazard + "_level"] = risk
+            weigth_map = np.where(country_bbox==index+1,0,np.nan)
+            for lev, weigth in enumerate(impact_dict["weight_hazard_levels"], start=2):
+                weigth_map = np.where(alert_bbox[hazard].values==lev,weigth,weigth_map)
+            aff_people = np.nansum(
+                weigth_map * np.squeeze(clipped_pop.values) * (row[impact_dict["lack_coping_capacity_col"]] / 10))
+            tot_people = np.nansum(
+                np.where(country_bbox == index + 1, np.squeeze(clipped_pop.values), np.nan))
+            impact_rate =  aff_people / tot_people
+            risk = 0
+            for risk_lev, risk_th in enumerate(impact_dict["risk_thresholds"], start=1):
+                if impact_rate >= risk_th:
+                    risk = risk_lev
+                else:
+                    break
+            shp_df_step.at[index, hazard + "_level"] = risk
+            shp_df_step.at[index, hazard + "AffPpl"] = aff_people
+            shp_df_step.at[index, hazard + "AffPrc"] = impact_rate
+            shp_df_step.at[index, "pop_total"] = tot_people
 
-        logging.info(" ---> Loop through the alert zones...DONE")
+        logging.info(" ---> Loop through the alert zones for " + hazard + " risk...DONE")
 
-        for hazard in hazards:
-            shp_df_step[hazard + '_level'] = shp_df_step[hazard + '_level'].fillna(-9999)
+        logging.info(" ---> Save shapefile for " + hazard + " risk...")
+        shp_df_step.to_file(out_name)
+        logging.info(" ---> Save shapefile for " + hazard + " risk...DONE")
 
-    return shp_df_step
 # ----------------------------------------------------------------------------
 
 # ----------------------------------------------------------------------------
