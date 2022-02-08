@@ -11,7 +11,7 @@
       "title": "Multihazard warning for Dewetra",
       "web-site": "",
       "source": "Python library developed by CIMA Research Foundation",
-      "history": "1.0.0 [20210812]",
+      "history": "1.2.0 [20210812]",
       "project-info": "fp-africa",
       "algorithm": "Postprocessing tool developed by CIMA Research Foundation"
     },
@@ -20,9 +20,11 @@
       "ancillary_datetime": "%Y%m%d%H%M",
       "outcome_sub_path_time": "%Y/%m/%d/",
       "outcome_datetime": "%Y%m%d%H%M",
-      "hmc_datetime_folder": "%Y/%m/%d/%H"
+      "hmc_datetime_folder": "%Y/%m/%d/%H",
+      "HAZARD": "{HAZARD}"
     },
     "settings": {
+      "hazards": ["rain", "wind"],
       "download_forecast_with_drops": false,
       "use_local_forecast_file": true,
       "min_warning_pixel": 0
@@ -62,19 +64,19 @@
       },
       "variables": {
         "rain": {
-          "name": "Total_precipitation_surface_Mixed_intervals_Accumulation",
+          "name": "rain",
           "level": "-",
           "date_selected": "all",
           "file":"/home/andrea/CIMA/DEVELOPEMENT/bulletin_impact/ancillary/nwp/gfs025/{outcome_sub_path_time}/forecast.nc"
         },
         "u-wind": {
-          "name": "u-component_of_wind_height_above_ground",
+          "name": "u-wind",
           "level": 10.0,
           "date_selected": "all",
           "file":"/home/andrea/CIMA/DEVELOPEMENT/bulletin_impact/ancillary/nwp/gfs025/{outcome_sub_path_time}/forecast.nc"
         },
         "v-wind": {
-          "name": "v-component_of_wind_height_above_ground",
+          "name": "v-wind",
           "level": 10.0,
           "date_selected": "all",
           "file":"/home/andrea/CIMA/DEVELOPEMENT/bulletin_impact/ancillary/nwp/gfs025/{outcome_sub_path_time}/forecast.nc"
@@ -86,10 +88,10 @@
       },
       "outcome": {
         "file_name": "multihazard_levels_{outcome_datetime}.nc",
-        "file_name_shape_hazard": "{outcome_datetime}.shp",
-        "file_name_shape_impacts": "{outcome_datetime}_impacts.shp",
         "folder": "/home/andrea/CIMA/DEVELOPEMENT/bulletin_impact/outcome/nwp/gfs025/{outcome_sub_path_time}/0000/",
+        "file_name_shape_hazard": "{outcome_datetime}_{HAZARD}.shp",
         "folder_shape_hazard": "/home/andrea/CIMA/DEVELOPEMENT/bulletin_impact/outcome/nwp/gfs025/{outcome_sub_path_time}",
+        "file_name_shape_impacts": "{outcome_datetime}_impacts_{HAZARD}.shp",
         "folder_shape_impacts": "/home/andrea/CIMA/DEVELOPEMENT/bulletin_impact/outcome/nwp/gfs025/{outcome_sub_path_time}"
       }
     },
