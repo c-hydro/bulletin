@@ -25,8 +25,8 @@
     },
     "settings": {
       "hazards": ["rain", "wind"],
-      "download_forecast_with_drops": false,
-      "use_local_forecast_file": true,
+      "download_forecast_with_drops": true,
+      "use_local_forecast_file": false,
       "min_warning_pixel": 0
     }
   },
@@ -64,19 +64,19 @@
       },
       "variables": {
         "rain": {
-          "name": "rain",
+          "name": "Total_precipitation_surface_Mixed_intervals_Accumulation",
           "level": "-",
           "date_selected": "all",
           "file":"/home/andrea/CIMA/DEVELOPEMENT/bulletin_impact/ancillary/nwp/gfs025/{outcome_sub_path_time}/forecast.nc"
         },
         "u-wind": {
-          "name": "u-wind",
+          "name": "u-component_of_wind_height_above_ground",
           "level": 10.0,
           "date_selected": "all",
           "file":"/home/andrea/CIMA/DEVELOPEMENT/bulletin_impact/ancillary/nwp/gfs025/{outcome_sub_path_time}/forecast.nc"
         },
         "v-wind": {
-          "name": "v-wind",
+          "name": "v-component_of_wind_height_above_ground",
           "level": 10.0,
           "date_selected": "all",
           "file":"/home/andrea/CIMA/DEVELOPEMENT/bulletin_impact/ancillary/nwp/gfs025/{outcome_sub_path_time}/forecast.nc"
@@ -98,8 +98,12 @@
     "impacts": {
       "lack_coping_capacity_col": "LACK_CC",
       "exposed_population_map": "/home/andrea/CIMA/PROJECT_IGAD2/bulletin/GHS_POP_E2015_AFRICA_R2019A_4326_9ss_V1_0.tif",
-      "weight_hazard_levels": [0.5,0.8,0.95],
-      "risk_thresholds": [0.000001,0.00001,0.05,0.4]
+      "weight_hazard_levels": {
+        "rain": [0.5,0.8,0.95],
+        "wind": [0.01,0.1,0.5]},
+      "risk_thresholds": {
+        "absolute": [10,500,10000,50000],
+        "relative": [null,null,0.005,0.05]}
     },
     "log": {
       "filename": "fp_africa_warning.txt",
