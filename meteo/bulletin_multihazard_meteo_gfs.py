@@ -6,7 +6,7 @@ __author__ =
         'Andrea Libertino (andrea.libertino@cimafoundation.org',
 __library__ = 'bulletin'
 General command line:
-### python fp_bulletin_hydro_glofas.py -settings_file "settings.json" -time "YYYY-MM-DD HH:MM"
+### python fp_bulletin_meteo_gfs.py -settings_file "settings.json" -time "YYYY-MM-DD HH:MM"
 Version(s):
 20220202 (1.2.0) --> Add impact assessment
 20211111 (1.1.0) --> Separate hydro components
@@ -41,8 +41,8 @@ def main():
     # -------------------------------------------------------------------------------------
     # Version and algorithm information
     alg_name = 'bulletin - Multihazard meteo warning for GFS '
-    alg_version = '1.1.0'
-    alg_release = '2021-11-11'
+    alg_version = '1.2.0'
+    alg_release = '2021-02-02'
     # -------------------------------------------------------------------------------------
 
     # -------------------------------------------------------------------------------------
@@ -224,8 +224,11 @@ def main():
             else:
                 data_lat = np.unique(data_drops.lat.values)
 
-            if variable == '10v' or variable == '10u' and len(data.shape)==4:
-                data = data_drops[variable].loc[:, 10.0, :, :].values
+            if variable == '10v' or variable == '10u':
+                try:
+                    data = data_drops[variable].loc[:, 10.0, :, :].values
+                except:
+                    data = data_drops[variable].values
             else:
                 data = data_drops[variable].values
 
@@ -379,6 +382,11 @@ def main():
     # -------------------------------------------------------------------------------------
     # Write output and clean
     logging.info(" --> Write output...")
+    if alert_daily.lat.values[2] < alert_daily.lat.values[1]:
+        logging.warning(" ---> Lat coordinate is flipped!")
+        alert_daily = alert_daily.assign_coords(lat = alert_daily.lat.values[::-1])
+        alert_daily["wind"].values = np.flipud(alert_daily["wind"].values)
+        alert_daily["rain"].values = np.flipud(alert_daily["rain"].values)
     alert_daily.to_netcdf(output_file)
 
     if data_settings["algorithm"]["flags"]["clear_ancillary_data"]:
@@ -613,19 +621,31 @@ def classify_warning_levels_impact_based(hazard, out_name, shp_df, alert_daily, 
             country_bbox = rasterize([(row['geometry'], index+1)], {"lon":lon_bbox, "lat":lat_bbox})
 
             weigth_map = np.where(country_bbox==index+1,0,np.nan)
-            for lev, weigth in enumerate(impact_dict["weight_hazard_levels"], start=2):
-                weigth_map = np.where(alert_bbox[hazard].values==lev,weigth,weigth_map)
+            for lev, weigth in enumerate(impact_dict["weight_hazard_levels"][hazard], start=2):
+                weigth_map = np.where(alert_bbox[hazard].values==lev,weigth_map+weigth,weigth_map)
             aff_people = np.nansum(
                 weigth_map * np.squeeze(clipped_pop.values) * (row[impact_dict["lack_coping_capacity_col"]] / 10))
             tot_people = np.nansum(
                 np.where(country_bbox == index + 1, np.squeeze(clipped_pop.values), np.nan))
-            impact_rate =  aff_people / tot_people
+            if tot_people == 0:
+                impact_rate = 0
+            else:
+                impact_rate =  aff_people / tot_people
             risk = 0
-            for risk_lev, risk_th in enumerate(impact_dict["risk_thresholds"], start=1):
-                if impact_rate >= risk_th:
+
+            for risk_lev, (risk_th_abs, risk_th_rel) in enumerate(zip(impact_dict["risk_thresholds"]["absolute"],
+                                                                      impact_dict["risk_thresholds"]["relative"]), start=1):
+                if risk_th_abs is None: risk_th_abs = 0
+                if risk_th_rel is None: risk_th_rel = 0
+
+                if risk_th_abs == 0 and risk_th_rel == 0:
+                    logging.error(" ERROR! Either a relative or an absolute threshold value should be provided for each risk class!")
+                    raise ValueError("Both absolute and relative trhesholds are none for class " + str(risk_lev))
+                elif impact_rate >= risk_th_rel and aff_people >= risk_th_abs:
                     risk = risk_lev
                 else:
                     break
+
             shp_df_step.at[index, hazard + "_level"] = risk
             shp_df_step.at[index, hazard + "AffPpl"] = aff_people
             shp_df_step.at[index, hazard + "AffPrc"] = impact_rate

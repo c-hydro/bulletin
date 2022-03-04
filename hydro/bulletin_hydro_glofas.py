@@ -48,12 +48,13 @@ def main():
 
     # Set algorithm settings
     data_settings = read_file_json(alg_settings)
-    cdo_path = data_settings["algorithm"]["system"]["cdo_path"]
-    grib_copy_path = data_settings["algorithm"]["system"]["grib_copy_path"]
+    paths = {}
+    paths["cdo"] = data_settings["algorithm"]["system"]["cdo_path"]
+    paths["grib_copy"] = data_settings["algorithm"]["system"]["grib_copy_path"]
 
     # Check eccodes version
     try:
-        output = subprocess.check_output(grib_copy_path+ "grib_copy -V", shell=True)
+        output = subprocess.check_output(paths["grib_copy"] + "grib_copy -V", shell=True)
         eccodes_version = output.decode("utf-8").split(" ")[2].replace("\n", "")
         eccodes_version_major = float(output.decode("utf-8").split(" ")[2].replace("\n", "").split(".")[0])
         eccodes_version_minor = float(output.decode("utf-8").split(" ")[2].replace("\n", "").split(".")[1])
@@ -90,14 +91,14 @@ def main():
     for key in dict_empty.keys():
         dict_filled[key] = date_now.strftime(dict_empty[key])
 
-    output_path = output_path_empty.format(**dict_filled)
-    output_resume_path = output_resume_path_empty.format(**dict_filled)
-    ancillary_path = ancillary_path_empty.format(**dict_filled)
-    ancillary_raw_path = os.path.join(ancillary_path,"raw","")
+    paths["output"] = output_path_empty.format(**dict_filled)
+    paths["output_resume"] = output_resume_path_empty.format(**dict_filled)
+    paths["ancillary"] = ancillary_path_empty.format(**dict_filled)
+    paths["ancillary_raw"] = os.path.join(paths["ancillary"],"raw","")
 
-    os.makedirs(output_path, exist_ok=True)
-    os.makedirs(output_resume_path, exist_ok=True)
-    os.makedirs(ancillary_raw_path, exist_ok =True)
+    os.makedirs(paths["output"], exist_ok=True)
+    os.makedirs(paths["output_resume"], exist_ok=True)
+    os.makedirs(paths["ancillary_raw"], exist_ok =True)
     # -------------------------------------------------------------------------------------
 
     # -------------------------------------------------------------------------------------
@@ -125,69 +126,19 @@ def main():
     # -------------------------------------------------------------------------------------
     # Download GLOFAS forecast
     logging.info(" --> Compute glofas forecast with date: " + date_now.strftime("%Y-%m-%d %H:%M"))
-
-    logging.info(" ---> Download glofas forecast from CDS...")
-    forecast_file = os.path.join(ancillary_raw_path, data_settings['data']['dynamic']['ancillary']['file_name']).format(**dict_filled)
-    bounding_box = [data_settings["data"]["dynamic"]["bbox"][i] for i in data_settings["data"]["dynamic"]["bbox"]]
-    time_steps = data_settings["data"]["dynamic"]["glofas"]["time_steps"]
-    ens_members = np.arange(0, data_settings["data"]["dynamic"]["glofas"]["ens_max"], 1)
-
-    digits = string.digits
-    rand_str = ''.join(random.choice(digits) for i in range(3))
-
-    c = cdsapi.Client()
-    c.retrieve(
-    'cems-glofas-forecast',
-    {
-         'system_version': 'operational',
-         'variable': 'river_discharge_in_the_last_24_hours',
-         'hydrological_model': 'lisflood',
-         'format': 'grib',
-         'product_type': ['control_forecast', 'ensemble_perturbed_forecasts'],
-         'year': str(date_now.year),
-         'month': str(date_now.month).zfill(2),
-         'day': str(date_now.day).zfill(2),
-         'leadtime_hour': time_steps,
-         'area': bounding_box,
-         'nocache':rand_str
-    },
-    forecast_file)
-    logging.info(" ---> Download glofas forecast from CDS...DONE")
-
-    logging.info(" ---> Convert GRIB fieldset to individual NC files...")
-    # Split the GRIB fieldset into individual GRIB fields
-    grib_field_template = os.path.join(ancillary_raw_path,'glofas_fc_[perturbationNumber]_[step].grb')
-    os.system(grib_copy_path + "grib_copy " + forecast_file + " " + grib_field_template)
-    grib_field_template = grib_field_template.replace("[","{").replace("]","}")
-
-    ancillary_avg_path = os.path.join(ancillary_path, "average")
-    os.makedirs(ancillary_avg_path, exist_ok=True)
-    nc_avg_name = os.path.join(ancillary_avg_path, "glofas_fc_avg_time_{step}.nc")
-
-    for step in time_steps:
-        logging.info(" ---> Compute time step " + step + "...")
-        for ens in ens_members:
-            ancillary_ens_path = os.path.join(ancillary_path, "ens_" + str(ens), "")
-            os.makedirs(ancillary_ens_path, exist_ok=True)
-            nc_ens_name = os.path.join(ancillary_ens_path,"glofas_fc_{perturbationNumber}_time_{step}.nc")
-            os.system((os.path.join(cdo_path, "cdo") + " -s -f nc copy " + grib_field_template + " " + nc_ens_name).format(perturbationNumber= str(ens), step=step))
-        logging.info(" ---> Average ensemble members...")
-        nc_ens_name = os.path.join(ancillary_path, "*", "glofas_fc_{perturbationNumber}_time_{step}.nc")
-        os.system((os.path.join(cdo_path, "cdo") + " -O -s ensmean " + nc_ens_name + " " + nc_avg_name).format(perturbationNumber="*", step=step))
-
-    ancillary_avg_path = os.path.join(ancillary_path, "average")
-    nc_avg_name = os.path.join(ancillary_avg_path, "glofas_fc_avg_time_{step}.nc")
-
-    logging.info(" ---> Convert GRIB fieldset to individual NC files...DONE")
+    nc_avg_name = download_from_cds(date_now, dict_filled, data_settings, paths)
     logging.info(" --> Compute glofas forecast with date: " + date_now.strftime("%Y-%m-%d %H:%M") + "...DONE")
     # -------------------------------------------------------------------------------------
 
     # -------------------------------------------------------------------------------------
     # Classify discharge maps
     logging.info(" --> Calculate hydro warning levels...")
+
     logging.info(" ---> Classify discharge maps...")
     first_step = True
     alert_level_days = {}
+
+    time_steps = data_settings["data"]["dynamic"]["glofas"]["time_steps"]
 
     for step in time_steps:
         logging.info(" ----> Analyse time step " + step + "...")
@@ -214,11 +165,11 @@ def main():
 
     logging.info(" ----> Save discharge maps...")
     out_map = xr.DataArray(alert_max, dims=["lat","lon"], coords={"lon": dis_max.lon.values, "lat": dis_max.lat.values})
-    out_file_tif = os.path.join(output_path, data_settings['data']['dynamic']['outcome']['file_name']).format(
+    out_file_tif = os.path.join(paths["output"], data_settings['data']['dynamic']['outcome']['file_name']).format(
         **dict_filled)
-    out_map.to_netcdf(os.path.join(ancillary_path, "temp.nc"))
+    out_map.to_netcdf(os.path.join(paths["ancillary"], "temp.nc"))
     os.system(
-        "gdal_translate " + os.path.join(ancillary_path, "temp.nc") + " -a_srs EPSG:4326 " + out_file_tif)
+        "gdal_translate " + os.path.join(paths["ancillary"], "temp.nc") + " -a_srs EPSG:4326 " + out_file_tif)
     logging.info(" ----> Save discharge maps...DONE")
 
     logging.info(" ---> Classify discharge maps...DONE")
@@ -259,14 +210,14 @@ def main():
     logging.info(" --> Write outputs and clean system...")
     logging.info(" ---> Write output shapefile...")
 
-    out_file_shp = os.path.join(output_resume_path, data_settings['data']['dynamic']['outcome']['file_name_resume']).format(
+    out_file_shp = os.path.join(paths["output_resume"], data_settings['data']['dynamic']['outcome']['file_name_resume']).format(
         **dict_filled)
-    shp_df_hydro_model.to_file(os.path.join(output_resume_path, out_file_shp))
+    shp_df_hydro_model.to_file(os.path.join(paths["output_resume"], out_file_shp))
     logging.info(" ---> Write outputs...DONE")
 
     if data_settings["algorithm"]["flags"]["clear_ancillary_data"] and not debug_mode:
         logging.info(" ---> Clean ancillary data...")
-        os.system("rm -r " + ancillary_path)
+        os.system("rm -r " + paths["ancillary"])
         logging.info(" ---> Clean ancillary data...DONE")
     else:
         logging.info(" ---> Clean ancillary data deactivated or debug mode active...SKIP")
@@ -392,6 +343,63 @@ def rasterize(shapes, coords, fill=np.nan, **kwargs):
                                     dtype=float, **kwargs)
         return xr.DataArray(raster, coords=coords, dims=('lat', 'lon'))
 # ----------------------------------------------------------------------------
+
+def download_from_cds(date_now, dict_filled, data_settings, paths):
+    logging.info(" ---> Download glofas forecast from CDS...")
+
+    forecast_file = os.path.join(paths["ancillary_raw"], data_settings['data']['dynamic']['ancillary']['file_name']).format(**dict_filled)
+    bounding_box = [data_settings["data"]["dynamic"]["bbox"][i] for i in data_settings["data"]["dynamic"]["bbox"]]
+    time_steps = data_settings["data"]["dynamic"]["glofas"]["time_steps"]
+    ens_members = np.arange(0, data_settings["data"]["dynamic"]["glofas"]["ens_max"], 1)
+
+    digits = string.digits
+    rand_str = ''.join(random.choice(digits) for i in range(3))
+
+    c = cdsapi.Client()
+    c.retrieve(
+    'cems-glofas-forecast',
+    {
+         'system_version': 'operational',
+         'variable': 'river_discharge_in_the_last_24_hours',
+         'hydrological_model': 'lisflood',
+         'format': 'grib',
+         'product_type': ['control_forecast', 'ensemble_perturbed_forecasts'],
+         'year': str(date_now.year),
+         'month': str(date_now.month).zfill(2),
+         'day': str(date_now.day).zfill(2),
+         'leadtime_hour': time_steps,
+         'area': bounding_box,
+         'nocache':rand_str
+    },
+    forecast_file)
+    logging.info(" ---> Download glofas forecast from CDS...DONE")
+
+    logging.info(" ---> Convert GRIB fieldset to individual NC files...")
+    # Split the GRIB fieldset into individual GRIB fields
+    grib_field_template = os.path.join(paths["ancillary_raw"],'glofas_fc_[perturbationNumber]_[step].grb')
+    os.system(paths["grib_copy"] + "grib_copy " + forecast_file + " " + grib_field_template)
+    grib_field_template = grib_field_template.replace("[","{").replace("]","}")
+
+    ancillary_avg_path = os.path.join(paths["ancillary"], "average")
+    os.makedirs(ancillary_avg_path, exist_ok=True)
+    nc_avg_name = os.path.join(ancillary_avg_path, "glofas_fc_avg_time_{step}.nc")
+
+    for step in time_steps:
+        logging.info(" ---> Compute time step " + step + "...")
+        for ens in ens_members:
+            ancillary_ens_path = os.path.join(paths["ancillary"], "ens_" + str(ens), "")
+            os.makedirs(ancillary_ens_path, exist_ok=True)
+            nc_ens_name = os.path.join(ancillary_ens_path,"glofas_fc_{perturbationNumber}_time_{step}.nc")
+            os.system((os.path.join(paths["cdo"], "cdo") + " -s -f nc copy " + grib_field_template + " " + nc_ens_name).format(perturbationNumber= str(ens), step=step))
+        logging.info(" ---> Average ensemble members...")
+        nc_ens_name = os.path.join(paths["ancillary"], "*", "glofas_fc_{perturbationNumber}_time_{step}.nc")
+        os.system((os.path.join(paths["cdo"], "cdo") + " -O -s ensmean " + nc_ens_name + " " + nc_avg_name).format(perturbationNumber="*", step=step))
+
+    ancillary_avg_path = os.path.join(paths["ancillary"], "average")
+    nc_avg_name = os.path.join(ancillary_avg_path, "glofas_fc_avg_time_{step}.nc")
+
+    logging.info(" ---> Convert GRIB fieldset to individual NC files...DONE")
+    return nc_avg_name
 
 # ----------------------------------------------------------------------------
 # Call script from external library
