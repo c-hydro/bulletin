@@ -1,13 +1,14 @@
 """
 bulletin - hydro - GLOFAS
-__date__ = '20211111'
-__version__ = '1.0.0'
+__date__ = '20220324'
+__version__ = '1.1.0'
 __author__ =
         'Andrea Libertino (andrea.libertino@cimafoundation.org',
 __library__ = 'bulletin'
 General command line:
 ### python fp_bulletin_hydro_glofas.py -settings_file "settings.json" -time "YYYY-MM-DD HH:MM"
 Version(s):
+20220324 (1.1.0) --> Add impact-based assessment
 20211111 (1.0.0) --> Beta release for Africa Continental Watch
 """
 # -------------------------------------------------------------------------------------
@@ -31,6 +32,7 @@ import time
 import subprocess
 import random
 import string
+import rioxarray as rx
 
 # -------------------------------------------------------------------------------------
 # Script Main
@@ -38,8 +40,8 @@ def main():
     # -------------------------------------------------------------------------------------
     # Version and algorithm information
     alg_name = 'bulletin - Hydrological warning with GLOFAS '
-    alg_version = '1.0.0'
-    alg_release = '2021-11-11'
+    alg_version = '1.1.0'
+    alg_release = '2022-03-24'
     # -------------------------------------------------------------------------------------
 
     # -------------------------------------------------------------------------------------
@@ -82,7 +84,8 @@ def main():
     # -------------------------------------------------------------------------------------
     # Create directories
     output_path_empty = data_settings['data']['dynamic']['outcome']['folder']
-    output_resume_path_empty = data_settings['data']['dynamic']['outcome']['folder_resume']
+    output_shape_hazard_empty = data_settings['data']['dynamic']['outcome']['folder_shape_hazard']
+    output_shape_impacts_empty = data_settings['data']['dynamic']['outcome']['folder_shape_impacts']
     ancillary_path_empty = data_settings['data']['dynamic']['ancillary']['folder']
 
     dict_empty = data_settings['algorithm']['template']
@@ -92,12 +95,14 @@ def main():
         dict_filled[key] = date_now.strftime(dict_empty[key])
 
     paths["output"] = output_path_empty.format(**dict_filled)
-    paths["output_resume"] = output_resume_path_empty.format(**dict_filled)
+    paths["output_shape_hazard"] = output_shape_hazard_empty.format(**dict_filled)
+    paths["output_shape_impacts"] = output_shape_impacts_empty.format(**dict_filled)
     paths["ancillary"] = ancillary_path_empty.format(**dict_filled)
     paths["ancillary_raw"] = os.path.join(paths["ancillary"],"raw","")
 
     os.makedirs(paths["output"], exist_ok=True)
-    os.makedirs(paths["output_resume"], exist_ok=True)
+    os.makedirs(paths["output_shape_hazard"], exist_ok=True)
+    os.makedirs(paths["output_shape_impacts"], exist_ok=True)
     os.makedirs(paths["ancillary_raw"], exist_ok =True)
     # -------------------------------------------------------------------------------------
 
@@ -126,7 +131,8 @@ def main():
     # -------------------------------------------------------------------------------------
     # Download GLOFAS forecast
     logging.info(" --> Compute glofas forecast with date: " + date_now.strftime("%Y-%m-%d %H:%M"))
-    nc_avg_name = download_from_cds(date_now, dict_filled, data_settings, paths)
+    #nc_avg_name = download_from_cds(date_now, dict_filled, data_settings, paths)
+    nc_avg_name = os.path.join('/home/andrea/CIMA/PROJECT_IGAD2/bulletin/Test_forecast_GLOFAS/24/average', "glofas_fc_avg_time_{step}.nc")
     logging.info(" --> Compute glofas forecast with date: " + date_now.strftime("%Y-%m-%d %H:%M") + "...DONE")
     # -------------------------------------------------------------------------------------
 
@@ -173,34 +179,40 @@ def main():
     logging.info(" ----> Save discharge maps...DONE")
 
     logging.info(" ---> Classify discharge maps...DONE")
+    # -------------------------------------------------------------------------------------
 
+    # -------------------------------------------------------------------------------------
+    # Assign hazard and impact levels
     logging.info(" ---> Assign flood country warning levels...")
-
-    # Assign flood country warning level
     shp_fo = data_settings["data"]["static"]["warning_regions"]
     shp_df = gpd.read_file(shp_fo)
-    shp_df_hydro_model = shp_df.copy()
-    shp_df_hydro_model["level_GLOFAS"] = -9999.0
-
     th_levels = xr.open_rasterio(out_file_tif).squeeze().rename({"x": "lon", "y": "lat"})
 
-    shapes = [(shape, n) for n, shape in enumerate(shp_df.geometry)]
-    ds = xr.Dataset(coords={'lon': th_levels['lon'].values, 'lat': th_levels['lat'].values})
-    ds['states'] = rasterize(shapes, ds.coords)
+    if data_settings["algorithm"]["flags"]["hazard_assessment"]:
+        shp_df_hydro_model = shp_df.copy()
+        shp_df_hydro_model["GLfl_level"] = -9999.0
+        out_file_shp = os.path.join(paths["output_shape_hazard"],
+                                    data_settings['data']['dynamic']['outcome']['file_name_shape_hazard'].format(
+                                        **dict_filled))
+        classify_warning_levels_pure_hazard(shp_df_hydro_model, th_levels, out_file_shp,
+                                            data_settings["data"]["dynamic"]["thresholds"]["min_warning_pixel"])
 
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore", category=RuntimeWarning)
-        logging.info(" ----> Loop through the alert zones...")
-        for index, row in shp_df_hydro_model.iterrows():
-            val_max = np.nanmax(th_levels.where(ds['states'] == index))
-            while val_max > 1:
-                tot_over = np.count_nonzero(th_levels.where(ds['states'] == index) >= val_max)
-                if tot_over >= data_settings["data"]["dynamic"]["thresholds"]["min_warning_pixel"]:
-                    break
-                else:
-                    val_max = val_max - 1
-            shp_df_hydro_model["level_GLOFAS"].at[index] = val_max
-        logging.info(" ----> Loop through the alert zones...DONE")
+    if data_settings["algorithm"]["flags"]["impact_assessment"]:
+        shp_df_hydro_model = shp_df.copy()
+        shp_df_hydro_model["GLfl_level"] = -9999.0
+        out_file_shp = os.path.join(paths["output_shape_impacts"],
+                                    data_settings['data']['dynamic']['outcome']['file_name_shape_impacts'].format(
+                                        **dict_filled))
+        impact_dict = data_settings["data"]["impacts"]
+        impact_dict["return_periods"] = data_settings["data"]["static"]["discharge_thresholds"]["return_periods"]
+        logging.info( "--> Mosaic flood maps..")
+        mosaic_flood_map = create_flood_map(th_levels, impact_dict)
+        mosaic_flood_map.to_netcdf(os.path.join(paths["ancillary"], "flood_map.nc"))
+        logging.info("--> Mosaic flood maps..DONE")
+        logging.info("--> Classify warning levels..")
+        classify_warning_levels_impact_based(shp_df_hydro_model, mosaic_flood_map, out_file_shp, impact_dict)
+        logging.info("--> Classify warning levels..DONE")
+
 
     logging.info(" --> Classify flood country warning levels...DONE")
     # -------------------------------------------------------------------------------------
@@ -210,9 +222,6 @@ def main():
     logging.info(" --> Write outputs and clean system...")
     logging.info(" ---> Write output shapefile...")
 
-    out_file_shp = os.path.join(paths["output_resume"], data_settings['data']['dynamic']['outcome']['file_name_resume']).format(
-        **dict_filled)
-    shp_df_hydro_model.to_file(os.path.join(paths["output_resume"], out_file_shp))
     logging.info(" ---> Write outputs...DONE")
 
     if data_settings["algorithm"]["flags"]["clear_ancillary_data"] and not debug_mode:
@@ -265,6 +274,118 @@ def read_file_json(file_name):
                 json_block = []
 
     return json_dict
+# -------------------------------------------------------------------------------------
+
+# -------------------------------------------------------------------------------------
+# Method to classify warning levels on a pure-hazard base
+def classify_warning_levels_pure_hazard(shp_df_hydro_model, th_levels, output_file, min_warn_pixels):
+        shapes = [(shape, n) for n, shape in enumerate(shp_df_hydro_model.geometry)]
+        ds = xr.Dataset(coords={'lon': th_levels['lon'].values, 'lat': th_levels['lat'].values})
+        ds['states'] = rasterize(shapes, ds.coords)
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", category=RuntimeWarning)
+            logging.info(" ----> Loop through the alert zones...")
+            for index, row in shp_df_hydro_model.iterrows():
+                val_max = np.nanmax(th_levels.where(ds['states'] == index))
+                while val_max > 1:
+                    tot_over = np.count_nonzero(th_levels.where(ds['states'] == index) >= val_max)
+                    if tot_over >= min_warn_pixels:
+                        break
+                    else:
+                        val_max = val_max - 1
+                shp_df_hydro_model["level_GLOFAS"].at[index] = val_max
+            logging.info(" ----> Loop through the alert zones...DONE")
+
+        logging.info(" ----> Write hazard shapefile...")
+        shp_df_hydro_model.to_file(output_file)
+# -------------------------------------------------------------------------------------
+
+# -------------------------------------------------------------------------------------
+# Mosaic flood maps
+def create_flood_map(th_levels, impact_dict):
+    logging.info(" --> Tailoring flood map")
+    decode_map = xr.open_rasterio(impact_dict["decode_map"]).squeeze()
+    decode_map.values[decode_map.values <0] = -1
+    th_levels_reindex = th_levels.reindex({"lon":decode_map.x.values, "lat":decode_map.y.values}, method='nearest')
+
+    for level, associated_rp in enumerate(impact_dict["flood_maps"]["associated_rp"], start=2):
+        logging.info(' ---> Import hazard level ' + str(level))
+        flood_map_level = xr.open_rasterio(impact_dict["flood_maps"]["file_name"].format(return_period=str(associated_rp))).squeeze().astype(np.int32)
+        flood_map_level.values[flood_map_level.values>99999] = 0
+        if level==2:
+            mosaic_flood_map = flood_map_level.copy()*0
+        if level in np.unique(th_levels_reindex.values):
+            codes_in = decode_map.values[th_levels_reindex==level]
+            codes_in = codes_in[codes_in>0]
+            flood_map_level.values[np.isin(flood_map_level.values,codes_in,invert=True)] = 0
+            mosaic_flood_map += flood_map_level
+
+    mosaic_flood_map = mosaic_flood_map/mosaic_flood_map
+    return mosaic_flood_map.astype(np.int8)
+
+# -------------------------------------------------------------------------------------
+
+# -------------------------------------------------------------------------------------
+# Classify a shapefile of countries with an alert level map with an impact-based approach
+def classify_warning_levels_impact_based(shp_df, mosaic_flood_map, out_file_shp, impact_dict):
+    hazard = "GLfl"
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", category=RuntimeWarning)
+        shp_df_step = shp_df.copy()
+
+        shp_df_step["pop_total"] = -9999.0
+        shp_df_step[hazard + "AffPpl"] = -9999.0
+        shp_df_step[hazard + "AffPrc"] = -9999.0
+        shp_df_step[hazard + "_level"] = -9999.0
+
+        logging.info(" ---> Loop through the alert zones for " + hazard + " risk...")
+
+        for index, row in shp_df_step.iterrows():
+            logging.info(" ----> Computing zone " + str(index +1) + " of " + str(len(shp_df_step)))
+            bbox = row["geometry"].bounds
+            clipped_pop = rx.open_rasterio(impact_dict["exposed_population_map"]).rio.clip_box(minx=bbox[0],miny=bbox[1],maxx=bbox[2],maxy=bbox[3])
+            clipped_pop.values[clipped_pop.values<0] = 0
+            lon_bbox = clipped_pop.x.values
+            lat_bbox = clipped_pop.y.values
+            alert_bbox = mosaic_flood_map.reindex({"x":lon_bbox, "y":lat_bbox}, method="nearest")
+            country_bbox = rasterize([(row['geometry'], index+1)], {"lon":lon_bbox, "lat":lat_bbox})
+
+            weigth_map = np.where((country_bbox==index+1) & (alert_bbox.values==1),1,np.nan)
+            aff_people = np.nansum(
+                weigth_map * np.squeeze(clipped_pop.values) * (row[impact_dict["lack_coping_capacity_col"]] / 10))
+            tot_people = np.nansum(
+                np.where(country_bbox == index + 1, np.squeeze(clipped_pop.values), np.nan))
+            if tot_people == 0:
+                impact_rate = 0
+            else:
+                impact_rate =  aff_people / tot_people
+            risk = 0
+
+            for risk_lev, (risk_th_abs, risk_th_rel) in enumerate(zip(impact_dict["risk_thresholds"]["absolute"],
+                                                                      impact_dict["risk_thresholds"]["relative"]), start=1):
+                if risk_th_abs is None: risk_th_abs = 0
+                if risk_th_rel is None: risk_th_rel = 0
+
+                if risk_th_abs == 0 and risk_th_rel == 0:
+                    logging.error(" ERROR! Either a relative or an absolute threshold value should be provided for each risk class!")
+                    raise ValueError("Both absolute and relative trhesholds are none for class " + str(risk_lev))
+                elif impact_rate >= risk_th_rel and aff_people >= risk_th_abs:
+                    risk = risk_lev
+                else:
+                    break
+
+            shp_df_step.at[index, hazard + "_level"] = risk
+            shp_df_step.at[index, hazard + "AffPpl"] = aff_people
+            shp_df_step.at[index, hazard + "AffPrc"] = impact_rate
+            shp_df_step.at[index, "pop_total"] = tot_people
+
+        logging.info(" ---> Loop through the alert zones for " + hazard + " risk...DONE")
+
+        logging.info(" ---> Save shapefile for " + hazard + " risk...")
+        shp_df_step.to_file(out_file_shp)
+        logging.info(" ---> Save shapefile for " + hazard + " risk...DONE")
+
 # -------------------------------------------------------------------------------------
 
 # -------------------------------------------------------------------------------------

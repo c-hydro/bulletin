@@ -1,11 +1,13 @@
 {
   "algorithm": {
     "flags":{
-      "clear_ancillary_data": true
+      "clear_ancillary_data": false,
+      "hazard_assessment": false,
+      "impact_assessment": true
     },
     "system":{
-      "cdo_path": "/home/fp/library/fp_apps_system/cdo-1.9.8_nc-4.6.0_hdf-1.8.17_eccodes-2.17.0/bin/",
-      "grib_copy_path" : "/home/fp/library/fp_libs_system/eccodes2.23.0/bin/"
+      "cdo_path": "/home/andrea/FP_libs/fp_libs_cdo/cdo-1.9.8_nc-4.6.0_hdf-1.8.17_eccodes-2.17.0/bin/cdo/",
+      "grib_copy_path" : "/usr/bin/"
     },
     "general": {
       "title": "Downloader GLOFAS",
@@ -24,12 +26,12 @@
   },
   "data": {
     "static": {
-      "warning_regions": "/home/fp/share/fp_africa/data/data_static/shapefile/ne_10m_admin_0_countries.shp",
-      "area": "/home/fp/share/fp_africa/data/data_static/raster/glofas/ups.tif",
+      "warning_regions": "/home/andrea/CIMA/PROJECT_IGAD2/bulletin/shp/adm_1_africa.shp",
+      "area": "/home/andrea/CIMA/PROJECT_IGAD2/bulletin/raster/ups.tif",
       "discharge_thresholds":{
-        "folder": "/home/fp/share/fp_africa/data/data_static/raster/glofas/",
-        "file_name": "th{return_period}.tif",
-        "return_periods": [2,5,20]
+        "folder": "/home/andrea/CIMA/PROJECT_IGAD2/bulletin/Discharge_threshold_GLOFAS/",
+        "file_name": "rl_{return_period}.nc.tif",
+        "return_periods": [2,5,10,20,50,100,200,500]
       }
     },
     "dynamic": {
@@ -50,18 +52,32 @@
       },
       "ancillary": {
         "file_name": "glofas_fc_{ancillary_datetime}.grib",
-        "folder": "/home/fp/share/fp_africa/data/data_dynamic/ancillary/hydro/glofas/{ancillary_sub_path_time}"
+        "folder": "/home/andrea/CIMA/PROJECT_IGAD2/bulletin/outcome/ancillary/hydro/glofas/{ancillary_sub_path_time}"
       },
-      "outcome": {
-        "file_name": "flood_hazard_levels_glofas_{outcome_datetime}.tif",
-        "file_name_resume": "{outcome_datetime}_FLOODGLOFAS.shp",
-        "folder": "/home/fp/share/fp_africa/data/data_dynamic/outcome/hydro/{outcome_sub_path_time}/0000/glofas/",
-        "folder_resume": "/home/fp/share/fp_africa/data/data_dynamic/outcome/hydro/{outcome_sub_path_time}/"
+        "outcome": {
+          "file_name": "flood_hazard_levels_glofas_{outcome_datetime}.tif",
+          "folder": "/home/andrea/CIMA/PROJECT_IGAD2/bulletin/outcome/hydro/{outcome_sub_path_time}/0000/glofas/",
+          "file_name_shape_hazard": "{outcome_datetime}_hazardFLOODGLOFAS.shp",
+          "folder_shape_hazard": "/home/andrea/CIMA/PROJECT_IGAD2/bulletin/outcome/hydro/{outcome_sub_path_time}/0000/glofas/",
+          "file_name_shape_impacts": "{outcome_datetime}_impactFLOODGLOFAS.shp",
+          "folder_shape_impacts": "/home/andrea/CIMA/PROJECT_IGAD2/bulletin/outcome/hydro/{outcome_sub_path_time}/0000/glofas/"
       }
+    },
+    "impacts": {
+      "lack_coping_capacity_col": "LACK_CC",
+      "exposed_population_map": "/home/andrea/CIMA/PROJECT_IGAD2/bulletin/GHS_POP_E2015_AFRICA_R2019A_4326_9ss_V1_0.tif",
+      "decode_map": "/home/andrea/CIMA/PROJECT_IGAD2/bulletin/Flood_maps_GLOFAS/crop_id5000_spread.tif",
+      "flood_maps": {
+        "file_name": "/home/andrea/CIMA/PROJECT_IGAD2/bulletin/Flood_maps_GLOFAS/crop_global_areaOfInfluence_{return_period}y.tif",
+        "associated_rp": [10,10,10,20,50,100,200,500]
+      },
+      "risk_thresholds": {
+        "absolute": [10,500,10000,50000],
+        "relative": [null,null,0.005,0.05]}
     },
     "log": {
       "filename": "fp_bulletin_hydro_GLOFAS_warning.txt",
-      "folder": "/home/fp/share/fp_africa/log/"
+      "folder": "/home/andrea/CIMA/PROJECT_IGAD2/bulletin/outcome/log/"
     }
   }
 }
