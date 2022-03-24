@@ -1,9 +1,12 @@
 =========
 Changelog
 =========
-Version 1.2.0 [2022-02-02]
+Version 1.2.0 [2022-03-24]
 **************************
 APP: **bulletin_multihazard_meteo_gfs.py**
+    - Added impact assessment
+    
+APP: **bulletin_hydro_glofas.py**
     - Added impact assessment
 
 Version 1.1.0 [2021-11-11]
@@ -11,7 +14,7 @@ Version 1.1.0 [2021-11-11]
 APP: **bulletin_multihazard_meteo_gfs.py**
      - Added backup procedure for using local forecast file
      
-- Separated hydro warnign components
+- Separated hydro warning components
 
 APP: **bulletin_hydro_glofas.py**
      - Release with GLOFAS support though CDS api
