@@ -26,4 +26,3 @@ Version 1.0.0 [2020-03-26]
 **************************
 APP: **bulletin_multihazard_meteo_gfs.py**
      - Starting version in experimental mode for FloodProofs Africa
-
