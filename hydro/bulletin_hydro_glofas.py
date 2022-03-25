@@ -131,8 +131,8 @@ def main():
     # -------------------------------------------------------------------------------------
     # Download GLOFAS forecast
     logging.info(" --> Compute glofas forecast with date: " + date_now.strftime("%Y-%m-%d %H:%M"))
-    #nc_avg_name = download_from_cds(date_now, dict_filled, data_settings, paths)
-    nc_avg_name = os.path.join('/home/andrea/CIMA/PROJECT_IGAD2/bulletin/Test_forecast_GLOFAS/24/average', "glofas_fc_avg_time_{step}.nc")
+    nc_avg_name = download_from_cds(date_now, dict_filled, data_settings, paths)
+    # nc_avg_name = os.path.join('/home/andrea/CIMA/PROJECT_IGAD2/bulletin/Test_forecast_GLOFAS/24/average', "glofas_fc_avg_time_{step}.nc")
     logging.info(" --> Compute glofas forecast with date: " + date_now.strftime("%Y-%m-%d %H:%M") + "...DONE")
     # -------------------------------------------------------------------------------------
 
