@@ -131,8 +131,13 @@ def main():
     # -------------------------------------------------------------------------------------
     # Download GLOFAS forecast
     logging.info(" --> Compute glofas forecast with date: " + date_now.strftime("%Y-%m-%d %H:%M"))
-    nc_avg_name = download_from_cds(date_now, dict_filled, data_settings, paths)
-    # nc_avg_name = os.path.join('/home/andrea/CIMA/PROJECT_IGAD2/bulletin/Test_forecast_GLOFAS/24/average', "glofas_fc_avg_time_{step}.nc")
+    if data_settings["algorithm"]["flags"]["download_frc"]:
+        logging.info(" ---> Download from CDS...")
+        nc_avg_name = download_from_cds(date_now, dict_filled, data_settings, paths)
+    else:
+        ancillary_avg_path = os.path.join(paths["ancillary"], "average")
+        nc_avg_name = os.path.join(ancillary_avg_path, "glofas_fc_avg_time_{step}.nc")
+        logging.info(" ---> Use already downloded forecast: " + nc_avg_name)
     logging.info(" --> Compute glofas forecast with date: " + date_now.strftime("%Y-%m-%d %H:%M") + "...DONE")
     # -------------------------------------------------------------------------------------
 
@@ -206,11 +211,11 @@ def main():
         impact_dict = data_settings["data"]["impacts"]
         impact_dict["return_periods"] = data_settings["data"]["static"]["discharge_thresholds"]["return_periods"]
         logging.info( "--> Mosaic flood maps..")
-        mosaic_flood_map = create_flood_map(th_levels, impact_dict)
-        mosaic_flood_map.to_netcdf(os.path.join(paths["ancillary"], "flood_map.nc"))
+        mosaic_weigthed_map = create_flood_map(th_levels, impact_dict)
+        mosaic_weigthed_map.to_netcdf(os.path.join(paths["ancillary"], "flood_weight_map.nc"))
         logging.info("--> Mosaic flood maps..DONE")
         logging.info("--> Classify warning levels..")
-        classify_warning_levels_impact_based(shp_df_hydro_model, mosaic_flood_map, out_file_shp, impact_dict)
+        classify_warning_levels_impact_based(shp_df_hydro_model, mosaic_weigthed_map, out_file_shp, impact_dict)
         logging.info("--> Classify warning levels..DONE")
 
 
@@ -313,16 +318,21 @@ def create_flood_map(th_levels, impact_dict):
         logging.info(' ---> Import hazard level ' + str(level))
         flood_map_level = xr.open_rasterio(impact_dict["flood_maps"]["file_name"].format(return_period=str(associated_rp))).squeeze().astype(np.int32)
         flood_map_level.values[flood_map_level.values>99999] = 0
+        flood_map_level.values[flood_map_level.values <0] = 0
         if level==2:
             mosaic_flood_map = flood_map_level.copy()*0
         if level in np.unique(th_levels_reindex.values):
             codes_in = decode_map.values[th_levels_reindex==level]
             codes_in = codes_in[codes_in>0]
             flood_map_level.values[np.isin(flood_map_level.values,codes_in,invert=True)] = 0
-            mosaic_flood_map += flood_map_level
+            mosaic_flood_map = xr.where(flood_map_level>1,level,mosaic_flood_map)
 
-    mosaic_flood_map = mosaic_flood_map/mosaic_flood_map
-    return mosaic_flood_map.astype(np.int8)
+    mosaic_weigthed_map = mosaic_flood_map.copy()
+    mosaic_weigthed_map.values = mosaic_weigthed_map.values*0
+    for key, level in enumerate(impact_dict["weight_hazard_levels"],start=2):
+        mosaic_weigthed_map.values = np.where(mosaic_flood_map.values == key, level, mosaic_weigthed_map.values )
+
+    return mosaic_weigthed_map.astype(np.float32)
 
 # -------------------------------------------------------------------------------------
 
@@ -351,7 +361,7 @@ def classify_warning_levels_impact_based(shp_df, mosaic_flood_map, out_file_shp,
             alert_bbox = mosaic_flood_map.reindex({"x":lon_bbox, "y":lat_bbox}, method="nearest")
             country_bbox = rasterize([(row['geometry'], index+1)], {"lon":lon_bbox, "lat":lat_bbox})
 
-            weigth_map = np.where((country_bbox==index+1) & (alert_bbox.values==1),1,np.nan)
+            weigth_map = np.where((country_bbox==index+1),alert_bbox.values,np.nan)
             aff_people = np.nansum(
                 weigth_map * np.squeeze(clipped_pop.values) * (row[impact_dict["lack_coping_capacity_col"]] / 10))
             tot_people = np.nansum(
