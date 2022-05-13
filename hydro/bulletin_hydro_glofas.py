@@ -1,13 +1,15 @@
 """
 bulletin - hydro - GLOFAS
-__date__ = '20220324'
-__version__ = '1.1.0'
+__date__ = '20220511'
+__version__ = '1.3.0'
 __author__ =
         'Andrea Libertino (andrea.libertino@cimafoundation.org',
 __library__ = 'bulletin'
 General command line:
 ### python fp_bulletin_hydro_glofas.py -settings_file "settings.json" -time "YYYY-MM-DD HH:MM"
 Version(s):
+20220511 (1.3.0) --> Added production of mosaic flood area map
+20220329 (1.2.0) --> Merged hazard classes for rearcompatibility
 20220324 (1.1.0) --> Add impact-based assessment
 20211111 (1.0.0) --> Beta release for Africa Continental Watch
 """
@@ -40,8 +42,8 @@ def main():
     # -------------------------------------------------------------------------------------
     # Version and algorithm information
     alg_name = 'bulletin - Hydrological warning with GLOFAS '
-    alg_version = '1.1.0'
-    alg_release = '2022-03-24'
+    alg_version = '1.3.0'
+    alg_release = '2022-05-11'
     # -------------------------------------------------------------------------------------
 
     # -------------------------------------------------------------------------------------
@@ -176,11 +178,22 @@ def main():
 
     logging.info(" ----> Save discharge maps...")
     out_map = xr.DataArray(alert_max, dims=["lat","lon"], coords={"lon": dis_max.lon.values, "lat": dis_max.lat.values})
-    out_file_tif = os.path.join(paths["output"], data_settings['data']['dynamic']['outcome']['file_name']).format(
-        **dict_filled)
+    out_file_tif = os.path.join(paths["output"], data_settings['data']['dynamic']['outcome']['file_name_levels']).format(**dict_filled)
+    out_file_flood_tif = os.path.join(paths["output"], data_settings['data']['dynamic']['outcome']['file_name_flood_map']).format(**dict_filled)
+    th_levels = out_map.copy()
+
+    if data_settings["algorithm"]["flags"]["convert_hazard_classes"]:
+        logging.info(" ----> Convert hazard classes")
+        haz_class_in = out_map.values
+        haz_class_out = np.ones(haz_class_in.shape)
+        dict_conversion = data_settings["data"]["hazard"]["conversion_table"]
+        for class_out in dict_conversion.keys():
+            classes_in = dict_conversion[class_out]
+            haz_class_out[np.isin(haz_class_in,classes_in)] = int(class_out)
+        out_map.values = haz_class_out
+
     out_map.to_netcdf(os.path.join(paths["ancillary"], "temp.nc"))
-    os.system(
-        "gdal_translate " + os.path.join(paths["ancillary"], "temp.nc") + " -a_srs EPSG:4326 " + out_file_tif)
+    os.system("gdal_translate " + os.path.join(paths["ancillary"], "temp.nc") + " -a_srs EPSG:4326 " + out_file_tif)
     logging.info(" ----> Save discharge maps...DONE")
 
     logging.info(" ---> Classify discharge maps...DONE")
@@ -191,11 +204,11 @@ def main():
     logging.info(" ---> Assign flood country warning levels...")
     shp_fo = data_settings["data"]["static"]["warning_regions"]
     shp_df = gpd.read_file(shp_fo)
-    th_levels = xr.open_rasterio(out_file_tif).squeeze().rename({"x": "lon", "y": "lat"})
+    #th_levels = xr.open_rasterio(out_file_tif).squeeze().rename({"x": "lon", "y": "lat"})
 
     if data_settings["algorithm"]["flags"]["hazard_assessment"]:
         shp_df_hydro_model = shp_df.copy()
-        shp_df_hydro_model["GLfl_level"] = -9999.0
+        shp_df_hydro_model["level_GLOFAS"] = -9999.0
         out_file_shp = os.path.join(paths["output_shape_hazard"],
                                     data_settings['data']['dynamic']['outcome']['file_name_shape_hazard'].format(
                                         **dict_filled))
@@ -212,6 +225,8 @@ def main():
         impact_dict["return_periods"] = data_settings["data"]["static"]["discharge_thresholds"]["return_periods"]
         logging.info( "--> Mosaic flood maps..")
         mosaic_weigthed_map = create_flood_map(th_levels, impact_dict)
+        out_mask = mosaic_weigthed_map / mosaic_weigthed_map
+        out_mask.astype(np.int8).rio.to_raster(out_file_flood_tif, compress='DEFLATE', dtype='int8')
         mosaic_weigthed_map.to_netcdf(os.path.join(paths["ancillary"], "flood_weight_map.nc"))
         logging.info("--> Mosaic flood maps..DONE")
         logging.info("--> Classify warning levels..")
@@ -354,7 +369,7 @@ def classify_warning_levels_impact_based(shp_df, mosaic_flood_map, out_file_shp,
         for index, row in shp_df_step.iterrows():
             logging.info(" ----> Computing zone " + str(index +1) + " of " + str(len(shp_df_step)))
             bbox = row["geometry"].bounds
-            clipped_pop = rx.open_rasterio(impact_dict["exposed_population_map"]).rio.clip_box(minx=bbox[0],miny=bbox[1],maxx=bbox[2],maxy=bbox[3])
+            clipped_pop = rx.open_rasterio(impact_dict["exposed_map"]).rio.clip_box(minx=bbox[0],miny=bbox[1],maxx=bbox[2],maxy=bbox[3])
             clipped_pop.values[clipped_pop.values<0] = 0
             lon_bbox = clipped_pop.x.values
             lat_bbox = clipped_pop.y.values
