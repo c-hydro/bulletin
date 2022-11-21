@@ -226,7 +226,9 @@ def main():
         logging.info( "--> Mosaic flood maps..")
         mosaic_weigthed_map = create_flood_map(th_levels, impact_dict)
         out_mask = mosaic_weigthed_map / mosaic_weigthed_map
-        out_mask.astype(np.int8).rio.to_raster(out_file_flood_tif, compress='DEFLATE', dtype='int8')
+        out_mask.rio.write_crs("epsg:4326", inplace=True)
+        out_mask.rio.write_nodata(0, inplace=True)
+        out_mask.astype(np.int16).rio.to_raster(out_file_flood_tif, compress='DEFLATE', dtype='int16')
         mosaic_weigthed_map.to_netcdf(os.path.join(paths["ancillary"], "flood_weight_map.nc"))
         logging.info("--> Mosaic flood maps..DONE")
         logging.info("--> Classify warning levels..")
@@ -488,8 +490,10 @@ def rasterize(shapes, coords, fill=np.nan, **kwargs):
                                     fill=fill, transform=transform,
                                     dtype=float, **kwargs)
         return xr.DataArray(raster, coords=coords, dims=('lat', 'lon'))
+
 # ----------------------------------------------------------------------------
 
+# ----------------------------------------------------------------------------
 def download_from_cds(date_now, dict_filled, data_settings, paths):
     logging.info(" ---> Download glofas forecast from CDS...")
 
