@@ -1,0 +1,93 @@
+{
+  "algorithm": {
+    "flags":{
+      "clear_ancillary_data": false,
+      "convert_hazard_classes": true,
+      "compute_partial_results": true,
+      "recompute_domains": true
+    },
+    "general": {
+      "title": "Bulletin Hydro FP",
+      "web-site": "",
+      "source": "Python library developed by CIMA Research Foundation",
+      "history": "1.0.0 [20221121]",
+      "project-info": "bulletin",
+      "algorithm": "Postprocessing tool developed by CIMA Research Foundation"
+    },
+    "template": {
+      "ancillary_sub_path_time": "%Y/%m/%d/",
+      "ancillary_datetime": "%Y%m%d%H%M",
+      "outcome_sub_path_time": "%Y/%m/%d/",
+      "outcome_datetime": "%Y%m%d%H%M"
+    }
+  },
+  "data": {
+    "static": {
+      "warning_regions": "/home/andrea/CIMA/PROJECT_IGAD2/assign/shp/igad_simplified.shp",
+      "area": "/home/andrea/CIMA/PROJECT_IGAD2/bulletin/raster/ups.tif",
+      "discharge_thresholds":{
+        "folder": "/home/andrea/CIMA/PROJECT_IGAD2/assign/TRESHOLDS/{domain}/",
+        "file_name": "Q_{return_period}.tif",
+        "return_periods": [2,5,10,20,50,100,200,500]
+      }
+    },
+    "dynamic": {
+      "fp": {
+        "forecast_length_h": 120,
+        "static_data_folder": "",
+        "results_folder": "/home/andrea/CIMA/PROJECT_IGAD2/assign/results_test/deterministic/{domain}",
+        "domains": ["IGAD_D1", "IGAD_D4"]
+      },
+      "thresholds": {
+        "area_km2": 1000,
+        "discharge_min": 10
+      },
+      "ancillary": {
+        "file_name_max": "max_fc_{domain}_{ancillary_datetime}.tif",
+        "file_name_alert": "alert_fc_{domain}_{ancillary_datetime}.tif",
+        "file_name_flood": "flood_fc_{domain}_{ancillary_datetime}.tif",
+        "folder": "/home/andrea/CIMA/PROJECT_IGAD2/assign/ANCILLARY/{ancillary_sub_path_time}"
+      },
+        "outcome": {
+          "file_name_levels": "flood_hazard_levels_fp_{outcome_datetime}.tif",
+          "file_name_flood_map": "flood_hazard_map_fp_{outcome_datetime}.tif",
+          "folder_maps": "/home/andrea/CIMA/PROJECT_IGAD2/assign/OUTCOME/hydro/{outcome_sub_path_time}/0000/fp/",
+          "file_name_shape_impacts": "{outcome_datetime}_impactFLOOD{exposed_element}.shp",
+          "folder_shape": "/home/andrea/CIMA/PROJECT_IGAD2/assign/OUTCOME/hydro/{outcome_sub_path_time}/0000/glofas/"
+      }
+    },
+    "hazard": {
+      "conversion_table":
+      { "1": [1],
+        "2": [2],
+        "3": [3,4],
+        "4": [5,6,7,8,9]
+      }
+    },
+    "impacts": {
+      "lack_coping_capacity_col": "LACK_CC",
+      "exposed_map": {
+        "cropm3": "/home/andrea/CIMA/PROJECT_IGAD2/risk_profile/igad_crop_int.tif",
+        "grazingm3": "/home/andrea/CIMA/PROJECT_IGAD2/risk_profile/igad_crop_int.tif",
+        "livestock": "/home/andrea/CIMA/PROJECT_IGAD2/risk_profile/igad_crop_int.tif",
+        "population": "/home/andrea/CIMA/PROJECT_IGAD2/risk_profile/igad_crop_int.tif",
+        "roadskm": "/home/andrea/CIMA/PROJECT_IGAD2/risk_profile/igad_crop_int.tif"
+      },
+      "decode_map": "/home/andrea/CIMA/PROJECT_IGAD2/assign/ASSIGNED_RAST/fp_area_{domain}.tif",
+      "flood_maps": {
+        "file_name": "/home/andrea/CIMA/PROJECT_IGAD2/assign/GLOFAS/sources/R_{return_period}_IGAD.tif",
+        "associated_rp": [10,10,10,20,50,100,200,500]
+      },
+      "weight_hazard_levels": [0.02,0.1,0.5,1,1,1,1,1],
+      "risk_thresholds": {
+        "absolute": null,
+        "relative": null
+      }
+    },
+    "log": {
+      "filename": "fp_bulletin_hydro_GLOFAS_warning.txt",
+      "folder": "/home/andrea/CIMA/PROJECT_IGAD2/bulletin/outcome/log/"
+    }
+  }
+}
+
