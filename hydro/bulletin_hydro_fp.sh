@@ -1,14 +1,15 @@
 #!/bin/bash -e
-
+export http_proxy=http://130.251.104.8:3128
+export https_proxy=http://130.251.104.8:3128
 #-----------------------------------------------------------------------------------------
 # Script information
-script_name='BULLETIN - HYDRO - HMC'
+script_name='FP IMPACT-BASED IGAD FORECAST'
 script_version="1.0.0"
-script_date='2021/11/11'
+script_date='2021/03/02'
 
 system_library_folder='/home/fp/library/'
-fp_folder='/share/fp/fp_africa/'
-lock_folder='/share/fp/fp_africa/lock/'
+fp_folder='/DATA/fp/fp_igad/'
+lock_folder='/DATA/fp/fp_igad/lock/'
 #-----------------------------------------------------------------------------------------
 
 #-----------------------------------------------------------------------------------------
@@ -16,22 +17,28 @@ lock_folder='/share/fp/fp_africa/lock/'
 virtualenv_folder=$system_library_folder'fp_virtualenv_python3/'
 virtualenv_name='fp_virtualenv_python3_hyde'
 
-script_folder=$system_library_folder'bulletin/hydro/'
-script_file=$script_folder'/fp_bulletin_hydro_hmc.py'
-settings_file=$fp_folder'fp_tools_postprocessing/fp_bulletin_hydro_hmc_africa.json'
+script_folder=$system_library_folder'bulletin/'
+script_file=$script_folder'/hydro/bulletin_hydro_fp.py'
+settings_file=$fp_folder'fp_tools_postprocessing/impact_assessment/bulletin_hydro_fp.json'
 
 # Get information (-u to get gmt time)
-#hour_run=00
-time_now=$(date -u +"%Y-%m-%d 00:00")
-#time_now='2021-11-14 00:00' # DEBUG
+hour_run=00
+time_now=$(date -u +"%Y-%m-%d $hour_run:00")
+time_now_folder=$(date -u +"/%Y/%m/%d")
+#time_now='2022-11-01 00:00' # DEBUG
+#time_now_folder='/2021/05/02' # DEBUG
 
 # Get lock information
-file_lock_start_raw='fp_africa_hydro_hmc_%YYYY%MM%DD_%HH_START.txt'
-file_lock_end_raw='fp_africa_hydro_hmc_%YYYY%MM%DD_%HH_END.txt'
+file_lock_start_raw='bulletin_lock_impact-based_gfs025_realtime_%YYYY%MM%DD_%HH_START.txt'
+file_lock_end_raw='bulletin_lock_impact-based_gfs025_realtime_%YYYY%MM%DD_%HH_END.txt'
 
-file_lock_init=false
-folder_lock_raw=$lock_folder
+file_lock_init=true
+folder_lock_raw=$lock_folder'postprocessing/'
 
+# Map merging information
+time_now_file="${time_now//[!0-9]/}"
+out_folder_step="/home/fp/data/fp_igad/archive/fp_impact_forecast/nwp_gfs-det/${time_now_folder}/0000/"
+ancillary_folder_step="/home/fp/data/fp_igad/run/fp_impact_forecast/${time_now_folder}/"
 #-----------------------------------------------------------------------------------------
 
 #-----------------------------------------------------------------------------------------
@@ -42,6 +49,8 @@ source activate $virtualenv_name
 # Add path to pythonpath
 export PYTHONPATH="${PYTHONPATH}:$script_folder"
 
+# Add additional bins to path
+export PATH=$cdo_folder:$PATH
 #-----------------------------------------------------------------------------------------
 
 # ----------------------------------------------------------------------------------------
@@ -136,9 +145,29 @@ elif [ ! -f $path_file_lock_def_start ] && [ ! -f $path_file_lock_def_end ]; the
     echo " ================================ " >> $path_file_lock_def_start
 
     # Run python script (using setting and time)
-    python3 $script_file -settings_file $settings_file -time "$time_now" || { rm $path_file_lock_def_start ; echo " ===> EXECUTION ... FAILED" ; rsync -zarv /home/fp/share/fp_africa/data/data_dynamic/outcome/hydro/* root@130.251.104.19:/share/archivio/experience/data/AFRICA_AUC/native; exit 1; } 
+    #python3 $script_file -settings_file $settings_file -time "$time_now" || { rm $path_file_lock_def_start ; echo " ===> EXECUTION ... FAILED" ; exit 1; } 
     
-    rsync -zarv /home/fp/share/fp_africa/data/data_dynamic/outcome/hydro/* root@130.251.104.19:/share/archivio/experience/data/AFRICA_AUC/native
+    # Merge gridded alert levels 
+    gdal_merge.py -o $out_folder_step/${time_now_file}_FPalert1kmNetwork.tif \
+    $ancillary_folder_step/alert_fc_IGAD_D3_${time_now_file}.tif \
+    $ancillary_folder_step/alert_fc_IGAD_D4_${time_now_file}.tif \
+    $ancillary_folder_step/alert_fc_IGAD_D5_${time_now_file}.tif \
+    $ancillary_folder_step/alert_fc_IGAD_D6_${time_now_file}.tif \
+    $ancillary_folder_step/alert_fc_IGAD_D7_${time_now_file}.tif \
+    $ancillary_folder_step/alert_fc_IGAD_D8_${time_now_file}.tif \
+    $ancillary_folder_step/alert_fc_IGAD_D9_${time_now_file}.tif \
+    $ancillary_folder_step/alert_fc_IGAD_D10_${time_now_file}.tif \
+    $ancillary_folder_step/alert_fc_IGAD_D11_${time_now_file}.tif \
+    $ancillary_folder_step/alert_fc_IGAD_D12_${time_now_file}.tif \
+    $ancillary_folder_step/alert_fc_IGAD_D14_${time_now_file}.tif \
+    -ul_lr 28.6241389 -14.9862778 51.4168056 15.5330833 -a_nodata 0 -ot Int16 || true
+    
+    gdal_merge.py -o $out_folder_step/${time_now_file}_FPalert3kmNetwork.tif \
+    $ancillary_folder_step/alert_fc_IGAD_D1_${time_now_file}.tif \
+    $ancillary_folder_step/alert_fc_IGAD_D2_${time_now_file}.tif \
+    -ul_lr 21.7325278 -4.0103056 39.7960000 23.3750278 -a_nodata 0 -ot Int16 || true
+    
+    gdalwarp -srcnodata 0 $ancillary_folder_step/alert_fc_IGAD_D15_${time_now_file}.tif $out_folder_step/${time_now_file}_FPalert1p5kmNetwork.tif || true
     
     # Lock File END
     time_step=$(date +"%Y-%m-%d %H:%S")

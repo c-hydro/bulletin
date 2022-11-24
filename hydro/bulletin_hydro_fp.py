@@ -29,6 +29,7 @@ import pytz
 import time
 import rioxarray as rx
 import pandas as pd
+from copy import deepcopy
 from rioxarray import merge
 
 # -------------------------------------------------------------------------------------
@@ -105,10 +106,10 @@ def main():
     # -------------------------------------------------------------------------------------
 
     # -------------------------------------------------------------------------------------
+    # Read and classify results
     flood_maps_ready = []
     missing_domains = []
 
-    # Read FloodProofs results
     for domain in data_settings["data"]["dynamic"]["fp"]["domains"]:
         logging.info(" --> Compute fp forecast with date: " + date_now.strftime("%Y-%m-%d %H:%M") + " for domain " + domain)
         dict_filled["domain"] = domain
@@ -138,24 +139,37 @@ def main():
         alert_map = np.ones(dis_max.shape)
         logging.info(" ----> Assign flood hazard level...")
         # Load static map for filtering
-        area = xr.open_rasterio(os.path.join(static_hmc_path, "{domain}.area.txt").format(**dict_filled))
-        areacell = xr.open_rasterio(os.path.join(static_hmc_path, "{domain}.areacell.txt").format(**dict_filled))
-        area_km = area * areacell / (10**6)
+        area = check_raster(xr.open_rasterio(os.path.join(static_hmc_path, "{domain}.area.txt").format(**dict_filled)))
+        areacell = check_raster(xr.open_rasterio(os.path.join(static_hmc_path, "{domain}.areacell.txt").format(**dict_filled)))
+        area_km = (area * areacell / (10**6)).squeeze()
         mask = np.where((river_mask==1) & (area_km>=data_settings["data"]["dynamic"]["thresholds"]["area_km2"]),1,0)
-        # Load tresholds
+
+        # Load tresholds and classify
         rps = [str(i) for i in data_settings["data"]["static"]["discharge_thresholds"]["return_periods"]]
         for val, rp in enumerate(rps, start=2):
             th_map_file = xr.open_rasterio(os.path.join(
                 data_settings["data"]["static"]["discharge_thresholds"]["folder"],
                 data_settings["data"]["static"]["discharge_thresholds"]["file_name"]).format(
                 domain=domain, return_period=rp))
-            th_map = check_geotif(th_map_file)
+            th_map = check_raster(th_map_file)
             th_map[th_map <= 0] = np.Inf
-            alert_map = np.where((dis_max >= th_map) & (dis_max >= data_settings["data"]["dynamic"]["thresholds"]["discharge_min"]), val, alert_map)
+            alert_map = np.where(((dis_max >= th_map) & (dis_max >= data_settings["data"]["dynamic"]["thresholds"]["discharge_min"])), val, alert_map)
         alert_map = np.where(mask == 1, alert_map, 0)
-        make_tif(alert_map, lon, lat, os.path.join(paths["ancillary"],data_settings["data"]["dynamic"]["ancillary"]["file_name_alert"]).format(**dict_filled))
+        alert_map_out = deepcopy(alert_map)
+
+        # Reclassify hazard classes
+        if data_settings["algorithm"]["flags"]["convert_hazard_classes"]:
+            logging.info(" ----> Convert hazard classes")
+            haz_class_out = np.ones(alert_map_out.shape) * 0
+            dict_conversion = data_settings["data"]["hazard"]["conversion_table"]
+            for class_out in dict_conversion.keys():
+                classes_in = dict_conversion[class_out]
+                haz_class_out[np.isin(alert_map_out, classes_in)] = int(class_out)
+            alert_map_out = haz_class_out
+        make_tif(alert_map_out, lon, lat, os.path.join(paths["ancillary"],data_settings["data"]["dynamic"]["ancillary"]["file_name_alert"]).format(**dict_filled), dtype='int16')
         logging.info(" ----> Assign flood hazard level...DONE")
 
+        # Mosaic weigth map for the domain
         logging.info(" ----> Merge flood map...")
         impact_dict = data_settings["data"]["impacts"]
         impact_dict["return_periods"] = data_settings["data"]["static"]["discharge_thresholds"]["return_periods"]
@@ -167,12 +181,14 @@ def main():
 
         flood_maps_ready = flood_maps_ready + [out_flood_ancillary_map]
 
+    # Check for all domains to be computed
     if len(flood_maps_ready) < len(data_settings["data"]["dynamic"]["fp"]["domains"]):
         logging.warning(" --> WARNING! Domains " + ','.join(missing_domains) + " are missing")
         if not data_settings["algorithm"]["flags"]["compute_partial_results"]:
             logging.error(" --> ERROR! Not all the domains has been computed!")
             raise RuntimeError
 
+    # Merge maps of all the domains
     igad_weight_map = xr.open_rasterio(flood_maps_ready[0]) * 0
     for val in flood_maps_ready:
         igad_weight_map.values = igad_weight_map.values + xr.open_rasterio(val).values
@@ -180,7 +196,7 @@ def main():
     logging.info(" ----> Save merged flood map...")
     dict_filled['domain'] = "merged"
     out_flood_merged_map = os.path.join(paths["ancillary"],data_settings["data"]["dynamic"]["ancillary"]["file_name_flood"]).format(**dict_filled)
-    out_file_flood_tif = os.path.join(paths["output"], data_settings['data']['dynamic']['outcome']['file_name_flood_map']).format(**dict_filled)
+    out_file_flood_tif = os.path.join(paths["output_maps"], data_settings['data']['dynamic']['outcome']['file_name_flood_map']).format(**dict_filled)
     igad_weight_map.rio.to_raster(out_flood_merged_map)
 
     out_mask = igad_weight_map / igad_weight_map
@@ -191,7 +207,7 @@ def main():
     # -------------------------------------------------------------------------------------
 
     # -------------------------------------------------------------------------------------
-    # Assign hazard and impact levels
+    # Assign impact levels
     for exposed_element in data_settings["data"]["impacts"]["exposed_map"].keys():
         dict_filled["exposed_element"] = exposed_element
         impact_dict["exposed_element"] = exposed_element
@@ -201,15 +217,23 @@ def main():
         shp_df = gpd.read_file(shp_fo)
 
         shp_df_hydro_model = shp_df.copy()
-        out_file_shp = os.path.join(paths["folder_shape"], data_settings['data']['dynamic']['outcome']['file_name_shape_impacts'].format(**dict_filled))
+        out_file_shp = os.path.join(paths["output_shape"], data_settings['data']['dynamic']['outcome']['file_name_shape_impacts'].format(**dict_filled))
         impact_dict = data_settings["data"]["impacts"]
         impact_dict["return_periods"] = data_settings["data"]["static"]["discharge_thresholds"]["return_periods"]
 
-        logging.info("--> Classify warning levels..")
-        classify_warning_levels_impact_based(shp_df_hydro_model, igad_weight_map, out_file_shp, impact_dict)
-        logging.info("--> Classify warning levels..DONE")
+        if np.nanmax(igad_weight_map) > 0 or data_settings["algorithm"]["flags"]["compute_stock_when_no_impact"]:
+            logging.info("--> Classify warning levels..")
+            classify_warning_levels_impact_based(shp_df_hydro_model, igad_weight_map, out_file_shp, impact_dict)
+            logging.info("--> Classify warning levels..DONE")
+        else:
+            logging.info("--> No impacts forecasted in the current forecast..")
+            shp_df_hydro_model["stock"] = -9999
+            shp_df_hydro_model["flood_tot"] = 0
+            shp_df_hydro_model["flood_perc"] = 0
+            shp_df_hydro_model.to_file(out_file_shp)
 
         logging.info(" --> Classify flood country warning levels...DONE")
+
     # -------------------------------------------------------------------------------------
 
     # -------------------------------------------------------------------------------------
@@ -276,13 +300,13 @@ def read_file_json(file_name):
 def create_flood_map(th_levels, impact_dict):
     logging.info(" --> Tailoring flood map")
     decode_map = xr.open_rasterio(impact_dict["decode_map"].format(domain=impact_dict["domain"])).squeeze()
-    decode_map_values = check_geotif(decode_map)
+    decode_map_values = check_raster(decode_map)
     decode_map_values[decode_map_values < 0] = -1
 
     for level, associated_rp in enumerate(impact_dict["flood_maps"]["associated_rp"], start=2):
         logging.info(' ---> Import hazard level ' + str(level))
         flood_map_level = xr.open_rasterio(impact_dict["flood_maps"]["file_name"].format(return_period=str(associated_rp))).squeeze().astype(np.int32)
-        flood_map_level.values = check_geotif(flood_map_level)
+        flood_map_level.values = check_raster(flood_map_level)
         flood_map_level.values[flood_map_level.values > 99999] = 0
         flood_map_level.values[flood_map_level.values < 0] = 0
         if level==2:
@@ -306,8 +330,7 @@ def create_flood_map(th_levels, impact_dict):
 
 # -------------------------------------------------------------------------------------
 # Classify a shapefile of countries with an alert level map with an impact-based approach
-def classify_warning_levels_impact_based(shp_df, mosaic_flood_map, out_file_shp, impact_dict):
-    hazard = "flood"
+def classify_warning_levels_impact_based(shp_df, mosaic_flood_map, out_file_shp, impact_dict, hazard = "flood"):
     if impact_dict["risk_thresholds"]["absolute"] is None or impact_dict["risk_thresholds"]["relative"] is None:
         no_tresholds = True
     else:
@@ -318,7 +341,7 @@ def classify_warning_levels_impact_based(shp_df, mosaic_flood_map, out_file_shp,
         shp_df_step = shp_df.copy()
 
         shp_df_step["stock"] = -9999.0
-        shp_df_step[hazard + "_total"] = -9999.0
+        shp_df_step[hazard + "_tot"] = -9999.0
         shp_df_step[hazard + "_perc"] = -9999.0
         if no_tresholds is False:
             shp_df_step[hazard + "_level"] = -9999.0
@@ -336,10 +359,8 @@ def classify_warning_levels_impact_based(shp_df, mosaic_flood_map, out_file_shp,
             country_bbox = rasterize([(row['geometry'], index+1)], {"lon":lon_bbox, "lat":lat_bbox})
 
             weigth_map = np.where((country_bbox==index+1),alert_bbox.values,np.nan)
-            aff_people = np.nansum(
-                weigth_map * np.squeeze(clipped_pop.values) * (row[impact_dict["lack_coping_capacity_col"]] / 10))
-            tot_people = np.nansum(
-                np.where(country_bbox == index + 1, np.squeeze(clipped_pop.values), np.nan))
+            aff_people = np.nansum(weigth_map * np.squeeze(clipped_pop.values) * (row[impact_dict["lack_coping_capacity_col"]] / 10))
+            tot_people = np.nansum(np.where(country_bbox == index + 1, np.squeeze(clipped_pop.values), np.nan))
             if tot_people == 0:
                 impact_rate = 0
             else:
@@ -362,7 +383,7 @@ def classify_warning_levels_impact_based(shp_df, mosaic_flood_map, out_file_shp,
                         break
                 shp_df_step.at[index, hazard + "_level"] = risk
 
-            shp_df_step.at[index, hazard + "_total"] = aff_people
+            shp_df_step.at[index, hazard + "_tot"] = aff_people
             shp_df_step.at[index, hazard + "_perc"] = impact_rate
             shp_df_step.at[index, "stock"] = tot_people
 
@@ -466,9 +487,10 @@ def transform_from_latlon(lat, lon):
 # -------------------------------------------------------------------------------------
 
 # -------------------------------------------------------------------------------------
-def make_tif(val, lon, lat, out_filename, nodata=-9999):
+def make_tif(val, lon, lat, out_filename, crs='epsg:4326', nodata=-9999, dtype='float32'):
     out_ds = xr.DataArray(val, dims=["y", "x"], coords={"y": lat, "x": lon})
-    out_ds = out_ds.where(out_ds != nodata)
+    out_ds = out_ds.where(out_ds != nodata).rio.write_crs(crs, inplace=True).rio.write_nodata(nodata, inplace=True)
+    out_ds.values = out_ds.values.astype(dtype)
     out_ds.rio.to_raster(out_filename, driver="GTiff", crs='EPSG:4326', height=len(lat), width=len(lon), dtype=out_ds.dtype, compress="DEFLATE")
 
 # -------------------------------------------------------------------------------------
@@ -490,7 +512,7 @@ def rasterize(shapes, coords, fill=np.nan, **kwargs):
 
 # ----------------------------------------------------------------------------
 
-def check_geotif(df):
+def check_raster(df):
     if df.y.values[2] < df.y.values[1]:
         oriented_df_value = np.flipud(df.squeeze().values)
     else:
