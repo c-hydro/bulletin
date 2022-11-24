@@ -4,7 +4,8 @@
       "clear_ancillary_data": false,
       "convert_hazard_classes": true,
       "compute_partial_results": true,
-      "recompute_domains": true
+      "recompute_domains": true,
+      "compute_stock_when_no_impact": true
     },
     "general": {
       "title": "Bulletin Hydro FP",
@@ -34,7 +35,7 @@
     "dynamic": {
       "fp": {
         "forecast_length_h": 120,
-        "static_data_folder": "",
+        "static_data_folder": "/home/andrea/CIMA/PROJECT_IGAD/FP_static_data/{domain}/gridded/",
         "results_folder": "/home/andrea/CIMA/PROJECT_IGAD2/assign/results_test/deterministic/{domain}",
         "domains": ["IGAD_D1", "IGAD_D4"]
       },
@@ -71,7 +72,9 @@
         "grazingm3": "/home/andrea/CIMA/PROJECT_IGAD2/risk_profile/igad_crop_int.tif",
         "livestock": "/home/andrea/CIMA/PROJECT_IGAD2/risk_profile/igad_crop_int.tif",
         "population": "/home/andrea/CIMA/PROJECT_IGAD2/risk_profile/igad_crop_int.tif",
-        "roadskm": "/home/andrea/CIMA/PROJECT_IGAD2/risk_profile/igad_crop_int.tif"
+        "roadskm": "/home/andrea/CIMA/PROJECT_IGAD2/risk_profile/igad_crop_int.tif",
+        "gdp": "/home/andrea/CIMA/PROJECT_IGAD2/risk_profile/igad_crop_int.tif",
+        "displaced": "/home/andrea/CIMA/PROJECT_IGAD2/risk_profile/igad_crop_int.tif"
       },
       "decode_map": "/home/andrea/CIMA/PROJECT_IGAD2/assign/ASSIGNED_RAST/fp_area_{domain}.tif",
       "flood_maps": {
