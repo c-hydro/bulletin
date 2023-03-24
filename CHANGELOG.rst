@@ -2,8 +2,9 @@
 Changelog
 =========
 Version 1.3.0 [2022-11-22]
+**************************
 APP: **bulletin_hydro_fp.py**
-    - Multi-impact assessment for Floodproofs
+    - Multi-impact assessment for FloodPROOFS
     
 Version 1.2.0 [2022-03-24]
 **************************
