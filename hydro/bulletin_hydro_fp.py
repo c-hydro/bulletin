@@ -1,5 +1,5 @@
 """
-bulletin - hydro - GLOFAS
+bulletin - hydro - floodPROOFS
 __date__ = '20221121'
 __version__ = '1.0.0'
 __author__ =
@@ -110,6 +110,9 @@ def main():
     flood_maps_ready = []
     missing_domains = []
 
+    impact_dict = data_settings["data"]["impacts"]
+    impact_dict["return_periods"] = data_settings["data"]["static"]["discharge_thresholds"]["return_periods"]
+
     for domain in data_settings["data"]["dynamic"]["fp"]["domains"]:
         logging.info(" --> Compute fp forecast with date: " + date_now.strftime("%Y-%m-%d %H:%M") + " for domain " + domain)
         dict_filled["domain"] = domain
@@ -171,8 +174,6 @@ def main():
 
         # Mosaic weigth map for the domain
         logging.info(" ----> Merge flood map...")
-        impact_dict = data_settings["data"]["impacts"]
-        impact_dict["return_periods"] = data_settings["data"]["static"]["discharge_thresholds"]["return_periods"]
         impact_dict["domain"] = domain
 
         flood_map, lat_mosaic, lon_mosaic = create_flood_map(alert_map, impact_dict)
@@ -218,8 +219,6 @@ def main():
 
         shp_df_hydro_model = shp_df.copy()
         out_file_shp = os.path.join(paths["output_shape"], data_settings['data']['dynamic']['outcome']['file_name_shape_impacts'].format(**dict_filled))
-        impact_dict = data_settings["data"]["impacts"]
-        impact_dict["return_periods"] = data_settings["data"]["static"]["discharge_thresholds"]["return_periods"]
 
         if np.nanmax(igad_weight_map) > 0 or data_settings["algorithm"]["flags"]["compute_stock_when_no_impact"]:
             logging.info("--> Classify warning levels..")
