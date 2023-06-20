@@ -1,13 +1,15 @@
 """
 bulletin - meteo multihazard - GFS025
-__date__ = '20220202'
-__version__ = '1.2.0'
+__date__ = '20230619'
+__version__ = '1.2.2'
 __author__ =
         'Andrea Libertino (andrea.libertino@cimafoundation.org',
 __library__ = 'bulletin'
 General command line:
 ### python fp_bulletin_meteo_gfs.py -settings_file "settings.json" -time "YYYY-MM-DD HH:MM"
 Version(s):
+20230619 (1.2.2) --> Added possibility of choose what variables to consider
+20220615 (1.2.1) --> Fixed bug with realtive/absolute tresholds
 20220202 (1.2.0) --> Add impact assessment
 20211111 (1.1.0) --> Separate hydro components
                      Add backup procedure
@@ -41,8 +43,8 @@ def main():
     # -------------------------------------------------------------------------------------
     # Version and algorithm information
     alg_name = 'bulletin - Multihazard meteo warning for GFS '
-    alg_version = '1.2.0'
-    alg_release = '2021-02-02'
+    alg_version = '1.2.2'
+    alg_release = '2023-06-19'
     # -------------------------------------------------------------------------------------
 
     # -------------------------------------------------------------------------------------
@@ -277,16 +279,31 @@ def main():
     # Postprocess variables
     logging.info(" --> Postprocess variables...")
 
-    logging.info(" ---> Decumulate accumulated rainfall and cumulate with rolling window...")
-    ds_decum = xr.concat([data['rain'][0:1,:,:], data['rain'].diff("time")], "time")
-    ds_rolling = ds_decum.rolling(time=8, min_periods=8, center=True).sum().shift(time=-1)
-    logging.info(" ---> Decumulate accumulated rainfall and cumulate with rolling window...DONE!")
+    processed_variables = {}
 
-    logging.info(" ---> Merge wind components...")
-    ds_wind = np.sqrt((data['u-wind']**2)+(data['v-wind']**2))
-    logging.info(" ---> Merge wind components...DONE!")
+    if "rain" in data_settings["algorithm"]["settings"]["hazards"]:
+        if not "cumulated_var" in data_settings["data"]["dynamic"]["variables"]["rain"].keys():
+            logging.warning(" --> Cumulation of rainfall forecast not specified! Rainfall is considered as cumulated")
+            data_settings["data"]["dynamic"]["variables"]["rain"]["cumulated_var"] = True
 
-    ds_out = xr.Dataset({"rain":ds_rolling, "wind":ds_wind})
+        logging.info(" ---> Decumulate accumulated rainfall...")
+        if data_settings["data"]["dynamic"]["variables"]["rain"]["cumulated_var"] is True:
+            ds_decum = xr.concat([data['rain'][0:1,:,:], data['rain'].diff("time")], "time")
+            logging.info(" ---> Decumulate accumulated rainfall ...DONE!")
+        else:
+            logging.info(" ---> Rainfall is already at hourly time step! Skipping")
+            ds_decum = data['rain']
+        logging.info(" ---> Cumulate with rolling window...")
+        processed_variables["rain"] = ds_decum.rolling(time=8, min_periods=8, center=True).sum().shift(time=-1)
+        logging.info(" ---> Cumulate with rolling window...DONE!")
+
+
+    if "wind" in data_settings["algorithm"]["settings"]["hazards"]:
+        logging.info(" ---> Merge wind components...")
+        processed_variables["wind"] = np.sqrt((data['u-wind']**2)+(data['v-wind']**2))
+        logging.info(" ---> Merge wind components...DONE!")
+
+    ds_out = xr.Dataset(processed_variables)
     ds_out_daily = ds_out.resample({"time":'D'}, skipna=True).max()
     ds_out_daily = ds_out_daily.reindex(time=pd.date_range(date_ref,forecast_end , freq='D').tz_localize(None), method='nearest')
     ds_out_daily.to_netcdf(ancillary_file)
@@ -296,48 +313,50 @@ def main():
 
     # -------------------------------------------------------------------------------------
     # Classify rainfall alert level
-    logging.info(" --> Classify rainfall alert level...")
+    if "rain" in data_settings["algorithm"]["settings"]["hazards"]:
+        logging.info(" --> Classify rainfall alert level...")
 
-    thresholds = data_settings['data']['static']['rain_thresholds']['quantiles']
-    limits = data_settings['data']['static']['rain_thresholds']['limits']
-    threshold_map = {}
+        thresholds = data_settings['data']['static']['rain_thresholds']['quantiles']
+        limits = data_settings['data']['static']['rain_thresholds']['limits']
+        threshold_map = {}
 
-    for th in thresholds:
-        threshold_map[str(th)] = xr.open_rasterio(
-            os.path.join(data_settings['data']['static']['rain_thresholds']['folder'],
-                         data_settings['data']['static']['rain_thresholds']['file_name']).format(quantile=str(th)))
-    df_threshold = xr.Dataset(threshold_map).squeeze().reindex(
-        {"x": ds_out_daily["lon"].values, "y": ds_out_daily["lat"].values}, method="nearest").rename_dims(
-        {"x": "lon", "y": "lat"})
+        for th in thresholds:
+            threshold_map[str(th)] = xr.open_rasterio(
+                os.path.join(data_settings['data']['static']['rain_thresholds']['folder'],
+                             data_settings['data']['static']['rain_thresholds']['file_name']).format(quantile=str(th)))
+        df_threshold = xr.Dataset(threshold_map).squeeze().reindex(
+            {"x": ds_out_daily["lon"].values, "y": ds_out_daily["lat"].values}, method="nearest").rename_dims(
+            {"x": "lon", "y": "lat"})
 
-    for th, lims in zip(thresholds, limits):
-        df_threshold[str(th)] = xr.where(df_threshold[str(th)] < lims[0], lims[0], df_threshold[str(th)])
-        df_threshold[str(th)] = xr.where(df_threshold[str(th)] > lims[1], lims[1], df_threshold[str(th)])
+        for th, lims in zip(thresholds, limits):
+            df_threshold[str(th)] = xr.where(df_threshold[str(th)] < lims[0], lims[0], df_threshold[str(th)])
+            df_threshold[str(th)] = xr.where(df_threshold[str(th)] > lims[1], lims[1], df_threshold[str(th)])
 
-    # for debug purposes only
-    if debug_mode:
-        df_threshold.to_netcdf(os.path.join(ancillary_folder, "thresholds_rain.nc"))
+        # for debug purposes only
+        if debug_mode:
+            df_threshold.to_netcdf(os.path.join(ancillary_folder, "thresholds_rain.nc"))
 
-    alert_maps = np.where(ds_out_daily["rain"].values >= 0, 1, np.nan)
-    for val, th in enumerate(thresholds, start=2):
-        alert_maps = np.where(ds_out_daily["rain"].values >= df_threshold[str(th)].values, val, alert_maps)
+        alert_maps = np.where(ds_out_daily["rain"].values >= 0, 1, np.nan)
+        for val, th in enumerate(thresholds, start=2):
+            alert_maps = np.where(ds_out_daily["rain"].values >= df_threshold[str(th)].values, val, alert_maps)
 
-    alert_daily["rain"].values = alert_maps
-    logging.info(" --> Classify rainfall alert level...DONE")
+        alert_daily["rain"].values = alert_maps
+        logging.info(" --> Classify rainfall alert level...DONE")
     # -------------------------------------------------------------------------------------
 
     # -------------------------------------------------------------------------------------
-    # Classify wind alert level
-    logging.info(" --> Classify wind alert level...")
+    if "wind" in data_settings["algorithm"]["settings"]["hazards"]:
+        # Classify wind alert level
+        logging.info(" --> Classify wind alert level...")
 
-    thresholds = data_settings['data']['static']['wind_thresholds']['values']
-    alert_maps = np.where(ds_out_daily["wind"].values >= 0, 1, np.nan)
+        thresholds = data_settings['data']['static']['wind_thresholds']['values']
+        alert_maps = np.where(ds_out_daily["wind"].values >= 0, 1, np.nan)
 
-    for val, th in enumerate(thresholds, start=2):
-        alert_maps = np.where(ds_out_daily["wind"].values >= th, val, alert_maps)
+        for val, th in enumerate(thresholds, start=2):
+            alert_maps = np.where(ds_out_daily["wind"].values >= th, val, alert_maps)
 
-    alert_daily["wind"].values = alert_maps
-    logging.info(" --> Classify wind alert level...DONE")
+        alert_daily["wind"].values = alert_maps
+        logging.info(" --> Classify wind alert level...DONE")
     # -------------------------------------------------------------------------------------
 
     # -------------------------------------------------------------------------------------
@@ -385,8 +404,9 @@ def main():
     if alert_daily.lat.values[2] < alert_daily.lat.values[1]:
         logging.warning(" ---> Lat coordinate is flipped!")
         alert_daily = alert_daily.assign_coords(lat = alert_daily.lat.values[::-1])
-        alert_daily["wind"].values = np.flipud(alert_daily["wind"].values)
-        alert_daily["rain"].values = np.flipud(alert_daily["rain"].values)
+        for haz in hazards:
+            alert_daily[haz].values = np.flipud(alert_daily[haz].values)
+            alert_daily[haz].values = np.flipud(alert_daily[haz].values)
     alert_daily.to_netcdf(output_file)
 
     if data_settings["algorithm"]["flags"]["clear_ancillary_data"]:

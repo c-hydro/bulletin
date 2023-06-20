@@ -67,7 +67,8 @@
           "name": "Total_precipitation_surface_Mixed_intervals_Accumulation",
           "level": "-",
           "date_selected": "all",
-          "file":"/home/andrea/CIMA/DEVELOPEMENT/bulletin_impact/ancillary/nwp/gfs025/{outcome_sub_path_time}/forecast.nc"
+          "file":"/home/andrea/CIMA/DEVELOPEMENT/bulletin_impact/ancillary/nwp/gfs025/{outcome_sub_path_time}/forecast.nc",
+          "accumulated_var": false
         },
         "u-wind": {
           "name": "u-component_of_wind_height_above_ground",

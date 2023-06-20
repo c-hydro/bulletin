@@ -66,6 +66,7 @@
       }
     },
     "impacts": {
+      "hazard_name": "flood",
       "lack_coping_capacity_col": "LACK_CC",
       "exposed_map": {
         "cropm3": "/home/andrea/CIMA/PROJECT_IGAD2/risk_profile/igad_crop_int.tif",

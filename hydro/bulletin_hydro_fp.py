@@ -1,13 +1,14 @@
 """
 bulletin - hydro - floodPROOFS
-__date__ = '20221121'
-__version__ = '1.0.0'
+__date__ = '20220615'
+__version__ = '1.0.1'
 __author__ =
         'Andrea Libertino (andrea.libertino@cimafoundation.org',
 __library__ = 'bulletin'
 General command line:
 ### python bulletin_hydro_fp.py -settings_file "settings.json" -time "YYYY-MM-DD HH:MM"
 Version(s):
+20220615 (1.0.1) --> Add adaptive name for hazard field
 20221121 (1.0.0) --> Beta release
 """
 # -------------------------------------------------------------------------------------
@@ -38,8 +39,8 @@ def main():
     # -------------------------------------------------------------------------------------
     # Version and algorithm information
     alg_name = 'bulletin - Hydrological warning with FloodProofs '
-    alg_version = '1.0.0'
-    alg_release = '2022-11-22'
+    alg_version = '1.0.1'
+    alg_release = '2023-06-15'
     # -------------------------------------------------------------------------------------
 
     # -------------------------------------------------------------------------------------
@@ -222,7 +223,12 @@ def main():
 
         if np.nanmax(igad_weight_map) > 0 or data_settings["algorithm"]["flags"]["compute_stock_when_no_impact"]:
             logging.info("--> Classify warning levels..")
-            classify_warning_levels_impact_based(shp_df_hydro_model, igad_weight_map, out_file_shp, impact_dict)
+            if not "hazard_name" in impact_dict.keys():
+                logging.warning(" ---> Name for hazard not provided, set as -flood-")
+                hazard = "flood"
+            else:
+                hazard = impact_dict["hazard_name"]
+            classify_warning_levels_impact_based(shp_df_hydro_model, igad_weight_map, out_file_shp, impact_dict, hazard=hazard)
             logging.info("--> Classify warning levels..DONE")
         else:
             logging.info("--> No impacts forecasted in the current forecast..")
