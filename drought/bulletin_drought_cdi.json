@@ -1,0 +1,85 @@
+{
+  "algorithm": {
+    "flags":{
+      "clear_ancillary_data": false,
+      "mask_sea": false,
+      "debug_mode": true,
+      "hazard_assessment": false,
+      "impact_assessment": true
+    },
+    "general": {
+      "title": "Drought with CDI",
+      "web-site": "",
+      "source": "Python library developed by CIMA Research Foundation",
+      "history": "1.0.0 [20230623]",
+      "project-info": "africa",
+      "algorithm": "Postprocessing tool developed by CIMA Research Foundation"
+    },
+    "template": {
+      "cdi_file_time": "%Y%m%d",
+      "ancillary_sub_path_time": "%Y/%m/%d/",
+      "ancillary_datetime": "%Y%m%d%H%M",
+      "outcome_sub_path_time": "%Y/%m/%d/",
+      "outcome_datetime": "%Y%m%d%H%M",
+      "hmc_datetime_folder": "%Y/%m/%d/%H"
+    },
+    "settings": {
+      "download_input": false,
+      "use_local_input_file": true,
+      "min_warning_pixel": 0
+    }
+  },
+  "data": {
+    "static": {
+      "warning_regions": "/home/andrea/Projects/DATABASE/africa/adm_1_africa.shp",
+      "sea_mask": "/home/andrea/CIMA/PROJECT_IGAD2/bulletin/raster/mask_sea.tif",
+      "drought_tresholds": [1,2,3]
+    },
+    "dynamic": {
+      "bbox": {
+        "lon_left": -20,
+        "lon_right": 55,
+        "lat_top": 40,
+        "lat_bottom": -40
+      },
+      "input": {
+        "local_file" : {
+          "folder": "/home/andrea/Projects/UNDRR_AUC/drought/data/",
+          "file_name": "rdria_m_wld_{cdi_file_time}_t.tif"
+        },
+        "remote_file_path": "/home/andrea/Projects/UNDRR_AUC/drought/data/"
+      },
+      "ancillary": {
+        "folder": "/home/andrea/Projects/UNDRR_AUC/drought/ancillary",
+        "file_name" : "classified_drought_map_{outcome_datetime}.nc"
+      },
+      "outcome": {
+        "file_name_shape_hazard": "{outcome_datetime}_drought.shp",
+        "folder_shape_hazard": "/home/andrea/Projects/UNDRR_AUC/drought/outcome/{outcome_sub_path_time}",
+        "file_name_shape_impacts": "{outcome_datetime}_impacts_drought.shp",
+        "folder_shape_impacts": "/home/andrea/Projects/UNDRR_AUC/drought/outcome/{outcome_sub_path_time}",
+        "file_name_table_impacts" : "{outcome_datetime}_table.csv",
+        "folder_table_impacts": "/home/andrea/Projects/UNDRR_AUC/drought/outcome/{outcome_sub_path_time}"
+      }
+    },
+    "impacts": {
+      "lack_coping_capacity_col": "LACK_CC",
+      "exposed_population_map": "/home/andrea/Projects/DATABASE/GHS_POP_E2020_AFRICA_R2022_4326_resamp_9ss_V1_0.tif",
+      "weight_hazard_levels": {
+        "drought": [0.02,0.2,0.5]
+      },
+      "risk_thresholds": {
+        "absolute": [10,500,10000,50000],
+        "relative": [null,null,0.005,0.05]},
+      "impact_summary": {
+        "save_impact_table": true,
+        "impact_table_aggregation_column": "NAME_0"
+      }
+    },
+    "log": {
+      "filename": "fp_africa_warning.txt",
+      "folder": "/home/andrea/CIMA/DEVELOPEMENT/bulletin_impact/log/"
+    }
+  }
+}
+

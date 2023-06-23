@@ -1,6 +1,11 @@
 =========
 Changelog
 =========
+Version 1.4.0 [2023-06-23]
+**************************
+APP: **bulletin_drought_cdi.py**
+    - Setup of IBF for drought based on CDI (prototype)
+
 Version 1.3.0 [2022-11-22]
 **************************
 APP: **bulletin_hydro_fp.py**
