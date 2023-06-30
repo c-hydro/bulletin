@@ -1,0 +1,125 @@
+{
+  "algorithm": {
+    "flags":{
+      "clear_ancillary_data": false,
+      "mask_sea": true,
+      "hazard_assessment": false,
+      "impact_assessment": true
+    },
+    "general": {
+      "title": "Multihazard warning for Dewetra",
+      "web-site": "",
+      "source": "Python library developed by CIMA Research Foundation",
+      "history": "1.2.0 [20210812]",
+      "project-info": "fp-africa",
+      "algorithm": "Postprocessing tool developed by CIMA Research Foundation"
+    },
+    "template": {
+      "ancillary_sub_path_time": "%Y/%m/%d/",
+      "ancillary_datetime": "%Y%m%d%H%M",
+      "forecast_datetime": "%Y%m%d%H",
+      "outcome_sub_path_time": "%Y/%m/%d/",
+      "outcome_datetime": "%Y%m%d%H%M",
+      "hmc_datetime_folder": "%Y/%m/%d/%H",
+      "hazard": "{hazard}",
+      "exposed_element": "{exposed_element}",
+      "model": "{model}"
+    },
+    "settings": {
+      "hazards": ["rain","wind"],
+      "hazards_short": ["rain","wind"],
+      "download_forecast_with_drops": true,
+      "use_local_forecast_file": false,
+      "min_warning_pixel": 0
+    }
+  },
+  "data": {
+    "static": {
+      "warning_regions": "/home/andrea/Desktop/Working_dir/bulletin_impact/input/adm_1_africa.shp",
+      "sea_mask": "/home/andrea/Desktop/Working_dir/bulletin_impact/input/mask_sea.tif",
+      "tresholds": {
+        "rain":{
+          "type": "map",
+          "folder": "/home/andrea/Desktop/Working_dir/bulletin_impact/input/rain_gev",
+          "file_name": "Q_{quantile}_filled.tif",
+          "quantiles": [50,80,95],
+          "limits": [[40,60],[70,100],[100,120]]
+      },
+        "wind": {
+          "type": "value",
+          "values": [13,18,23]
+       }
+      }
+    },
+    "dynamic": {
+      "model": "gfs0p25_drops",
+      "time": {
+        "forecast_resolution_h": 3,
+        "forecast_length_h": 120
+      },
+      "bbox": {
+        "lon_left": -20,
+        "lon_right": 55,
+        "lat_top": 40,
+        "lat_bottom": -40
+      },
+      "drops2": {
+        "DropsAddress": "http://dds.cimafoundation.org/dds/rest",
+        "DropsUser": null,
+        "DropsPwd": null,
+        "DropsDataId": "GFS025",
+        "future_time_search_window_h": 6,
+        "past_time_search_window_h": 6
+      },
+      "variables": {
+        "rain": {
+          "name": "Total_precipitation_surface_Mixed_intervals_Accumulation",
+          "level": "-",
+          "date_selected": "all",
+          "file":"/home/andrea/Desktop/Working_dir/bulletin_impact/ancillary/nwp/{model}/{outcome_sub_path_time}/forecast.nc",
+          "accumulated": true
+        },
+        "u-wind": {
+          "name": "u-component_of_wind_height_above_ground",
+          "level": 10.0,
+          "date_selected": "all",
+          "file":"/home/andrea/Desktop/Working_dir/bulletin_impact/ancillary/nwp/{model}/{outcome_sub_path_time}/forecast.nc"
+        },
+        "v-wind": {
+          "name": "v-component_of_wind_height_above_ground",
+          "level": 10.0,
+          "date_selected": "all",
+          "file":"/home/andrea/Desktop/Working_dir/bulletin_impact/ancillary/nwp/{model}/{outcome_sub_path_time}/forecast.nc"
+        }
+      },
+       "ancillary": {
+        "file_name": "{model}_{ancillary_datetime}_max.nc",
+        "folder": "/home/andrea/Desktop/Working_dir/bulletin_impact/ancillary/nwp/{model}/{ancillary_sub_path_time}"
+      },
+      "outcome": {
+        "file_name": "multihazard_{model}_levels_{outcome_datetime}.nc",
+        "folder": "/home/andrea/Desktop/Working_dir/bulletin_impact/outcome/nwp/{model}/{outcome_sub_path_time}/0000/",
+        "file_name_shape_hazard": "{outcome_datetime}_{model}_hazard_{hazard}.shp",
+        "folder_shape_hazard": "/home/andrea/Desktop/Working_dir/bulletin_impact/outcome/nwp/{model}/{outcome_sub_path_time}",
+        "file_name_shape_impacts": "{outcome_datetime}_{model}_impacts_{hazard}_{exposed_element}.shp",
+        "folder_shape_impacts": "/home/andrea/Desktop/Working_dir/bulletin_impact/outcome/nwp/{model}/{outcome_sub_path_time}"
+      }
+    },
+    "impacts": {
+      "lack_coping_capacity_col": "LACK_CC",
+      "exposed_map": {
+        "population": "/home/andrea/Desktop/Working_dir/bulletin_impact/input/GHS_POP_E2020_AFRICA_R2022_4326_resamp_9ss_V1_0.tif"
+      },
+      "weight_hazard_levels": {
+        "rain": [0.02,0.1,0.5],
+        "wind": [0.02,0.1,0.5]},
+      "risk_thresholds": {
+        "absolute": [10,500,10000,50000],
+        "relative": [null,null,0.005,0.05]}
+    },
+    "log": {
+      "filename": "fp_africa_warning.txt",
+      "folder": "/home/andrea/Desktop/Working_dir/bulletin_impact/log/"
+    }
+  }
+}

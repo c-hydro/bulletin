@@ -233,8 +233,8 @@ def main():
         else:
             logging.info("--> No impacts forecasted in the current forecast..")
             shp_df_hydro_model["stock"] = -9999
-            shp_df_hydro_model["flood_tot"] = 0
-            shp_df_hydro_model["flood_perc"] = 0
+            shp_df_hydro_model[hazard + "_tot"] = 0
+            shp_df_hydro_model[hazard + "_perc"] = 0
             shp_df_hydro_model.to_file(out_file_shp)
 
         logging.info(" --> Classify flood country warning levels...DONE")
