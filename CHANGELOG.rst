@@ -1,10 +1,15 @@
 =========
 Changelog
 =========
-Version 1.4.0 [2023-06-23]
+Version 1.4.0 [2023-06-30]
 **************************
 APP: **bulletin_drought_cdi.py**
     - Setup of IBF for drought based on CDI (prototype)
+
+APP: **bulletin_meteo_multimodel.py**
+    - Improved adaptability to different meteorological models
+    - Added possibility of include more exposed elements
+    - Improved adaptability to several meteorological hazards
 
 Version 1.3.0 [2022-11-22]
 **************************
