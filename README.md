@@ -11,4 +11,4 @@ It consists of different functions for dealing with:
 
 The tools are consistent with the risk definiton provided by UNDRR and allow to perform an impact-based forecast by considering different exposure layers provided as geotiff files.
 
-![](/home/andrea/Pictures/Screenshots/IBF_CIMA.png)
+![IBF_CIMA](https://github.com/c-hydro/bulletin/assets/57633516/a60ef6f1-8179-4147-a6f0-7936d06fe76c)
