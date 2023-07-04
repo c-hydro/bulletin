@@ -17,7 +17,7 @@
     "template": {
       "ancillary_sub_path_time": "%Y/%m/%d/",
       "ancillary_datetime": "%Y%m%d%H%M",
-      "forecast_datetime": "%Y%m%d%H",
+      "forecast_datetime": "%Y-%m-%d_%H:%M:%S",
       "outcome_sub_path_time": "%Y/%m/%d/",
       "outcome_datetime": "%Y%m%d%H%M",
       "hmc_datetime_folder": "%Y/%m/%d/%H",
@@ -26,8 +26,8 @@
       "model": "{model}"
     },
     "settings": {
-      "hazards": ["rain","wind"],
-      "hazards_short": ["rain","wind"],
+      "hazards": ["rain","wind","temperature"],
+      "hazards_short": ["rain","wind","temp"],
       "download_forecast_with_drops": false,
       "use_local_forecast_file": true,
       "min_warning_pixel": 0
@@ -35,7 +35,7 @@
   },
   "data": {
     "static": {
-      "warning_regions": "/home/andrea/Desktop/Working_dir/bulletin_impact/input/adm_1_africa.shp",
+      "warning_regions": "/home/andrea/Projects/Sudan/SDN_admin_0_1_2_3/SDN_adm2.shp",
       "sea_mask": "/home/andrea/Desktop/Working_dir/bulletin_impact/input/mask_sea.tif",
       "tresholds": {
         "rain":{
@@ -48,20 +48,24 @@
         "wind": {
           "type": "value",
           "values": [13,18,23]
+       },
+        "temperature": {
+          "type": "value",
+          "values": [303.15,308.15,311.15]
        }
       }
     },
     "dynamic": {
-      "model": "gfs0p25",
+      "model": "wrf",
       "time": {
         "forecast_resolution_h": 1,
-        "forecast_length_h": 120
+        "forecast_length_h": 72
       },
       "bbox": {
-        "lon_left": -20,
-        "lon_right": 55,
-        "lat_top": 40,
-        "lat_bottom": -40
+        "lon_left": 20,
+        "lon_right": 40,
+        "lat_top": 24,
+        "lat_bottom": 8
       },
       "drops2": {
         "DropsAddress": "http://dds.cimafoundation.org/dds/rest",
@@ -73,23 +77,29 @@
       },
       "variables": {
         "rain": {
-          "name": "tp",
+          "name": "RAINSUM",
           "level": "-",
           "date_selected": "all",
-          "file":"/home/andrea/Desktop/Working_dir/gfs/outcome/{outcome_sub_path_time}/africa_{model}_{forecast_datetime}.nc",
-          "accumulated": false
+          "file":"/home/andrea/Desktop/Working_dir/wrf-sudan/sudan-d01-{forecast_datetime}UTC.nc",
+          "accumulated": true
         },
         "u-wind": {
-          "name": "10u",
+          "name": "U10",
           "level": 10.0,
           "date_selected": "all",
-          "file":"/home/andrea/Desktop/Working_dir/gfs/outcome/{outcome_sub_path_time}/africa_{model}_{forecast_datetime}.nc"
+          "file":"/home/andrea/Desktop/Working_dir/wrf-sudan/sudan-d01-{forecast_datetime}UTC.nc"
         },
         "v-wind": {
-          "name": "10v",
+          "name": "V10",
           "level": 10.0,
           "date_selected": "all",
-          "file":"/home/andrea/Desktop/Working_dir/gfs/outcome/{outcome_sub_path_time}/africa_{model}_{forecast_datetime}.nc"
+          "file":"/home/andrea/Desktop/Working_dir/wrf-sudan/sudan-d01-{forecast_datetime}UTC.nc"
+        },
+        "temperature": {
+          "name": "T2",
+          "level": 2.0,
+          "date_selected": "all",
+          "file":"/home/andrea/Desktop/Working_dir/wrf-sudan/sudan-d01-{forecast_datetime}UTC.nc"
         }
       },
       "ancillary": {
@@ -101,7 +111,7 @@
         "folder": "/home/andrea/Desktop/Working_dir/bulletin_impact/outcome/nwp/{model}/{outcome_sub_path_time}/0000/",
         "file_name_shape_hazard": "{outcome_datetime}_{model}_hazard_{hazard}.shp",
         "folder_shape_hazard": "/home/andrea/Desktop/Working_dir/bulletin_impact/outcome/nwp/{model}/{outcome_sub_path_time}",
-        "file_name_shape_impacts": "{outcome_datetime}_{model}_impacts_{hazard}_{exposed_element}.shp",
+        "file_name_shape_impacts": "{outcome_datetime}_{model}_impacts_{hazard}_{exposed_element}_adm2.shp",
         "folder_shape_impacts": "/home/andrea/Desktop/Working_dir/bulletin_impact/outcome/nwp/{model}/{outcome_sub_path_time}"
       }
     },
@@ -112,7 +122,8 @@
       },
       "weight_hazard_levels": {
         "rain": [0.02,0.1,0.5],
-        "wind": [0.02,0.1,0.5]},
+        "wind": [0.02,0.1,0.5],
+        "temperature":  [0.02,0.1,0.5]},
       "risk_thresholds": {
         "absolute": [10,500,10000,50000],
         "relative": [null,null,0.005,0.05]}
