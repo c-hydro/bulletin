@@ -52,7 +52,7 @@
       }
     },
     "dynamic": {
-      "model": "gfs0p25",
+      "model": "cmc-gdps0p15",
       "time": {
         "forecast_resolution_h": 1,
         "forecast_length_h": 120
@@ -76,20 +76,20 @@
           "name": "tp",
           "level": "-",
           "date_selected": "all",
-          "file":"/home/andrea/Desktop/Working_dir/gfs/outcome/{outcome_sub_path_time}/africa_{model}_{forecast_datetime}.nc",
+          "file":"/home/andrea/Desktop/Working_dir/cmc/outcome/{outcome_sub_path_time}/africa_{model}_{forecast_datetime}.nc",
           "accumulated": false
         },
         "u-wind": {
           "name": "10u",
           "level": 10.0,
           "date_selected": "all",
-          "file":"/home/andrea/Desktop/Working_dir/gfs/outcome/{outcome_sub_path_time}/africa_{model}_{forecast_datetime}.nc"
+          "file":"/home/andrea/Desktop/Working_dir/cmc/outcome/{outcome_sub_path_time}/africa_{model}_{forecast_datetime}.nc"
         },
         "v-wind": {
           "name": "10v",
           "level": 10.0,
           "date_selected": "all",
-          "file":"/home/andrea/Desktop/Working_dir/gfs/outcome/{outcome_sub_path_time}/africa_{model}_{forecast_datetime}.nc"
+          "file":"/home/andrea/Desktop/Working_dir/cmc/outcome/{outcome_sub_path_time}/africa_{model}_{forecast_datetime}.nc"
         }
       },
       "ancillary": {

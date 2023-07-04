@@ -181,11 +181,13 @@ def main():
         logging.info(" ---> Decumulate accumulated rainfall ...DONE!")
     else:
         logging.info(" ---> Rainfall is already at hourly time step! Skipping")
-        ds_decum = data['rain']
+        ds_decum = data['rain'].copy()
 
     logging.info(" ---> Cumulate with rolling window...")
     steps_in_24_hours = int(24 / data_settings['data']['dynamic']['time']["forecast_resolution_h"])
     processed_variables["rain"] = ds_decum.rolling(time=steps_in_24_hours, center=True).sum().shift(time=-1)
+    # This to avoid numerical approximation problems that could lead to negative values
+    processed_variables["rain"] = xr.where(processed_variables["rain"]<0,0,processed_variables["rain"])
     logging.info(" ---> Cumulate with rolling window...DONE!")
 
     if "wind" in data_settings["algorithm"]["settings"]["hazards"]:
@@ -193,6 +195,11 @@ def main():
         processed_variables["wind"] = np.sqrt((data['u-wind']**2)+(data['v-wind']**2))
         logging.info(" ---> Merge wind components...DONE!")
     logging.info(" --> Postprocess specific variables...DONE")
+
+    for var in data_settings["algorithm"]["settings"]["hazards"]:
+        if var not in ["wind", "rain"]:
+            logging.info(" ---> Variable " + var + " is already in a standar format...SKIP processing")
+            processed_variables[var] = data[var].copy()
     # -------------------------------------------------------------------------------------
 
     # -------------------------------------------------------------------------------------
