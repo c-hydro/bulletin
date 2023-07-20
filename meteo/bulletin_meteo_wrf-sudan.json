@@ -76,8 +76,15 @@
         "past_time_search_window_h": 6
       },
       "variables": {
-        "rain": {
-          "name": "RAINSUM",
+        "rainnc": {
+          "name": "RAINNC",
+          "level": "-",
+          "date_selected": "all",
+          "file":"/home/andrea/Desktop/Working_dir/wrf-sudan/sudan-d01-{forecast_datetime}UTC.nc",
+          "accumulated": true
+        },
+        "rainc": {
+          "name": "RAINC",
           "level": "-",
           "date_selected": "all",
           "file":"/home/andrea/Desktop/Working_dir/wrf-sudan/sudan-d01-{forecast_datetime}UTC.nc",

@@ -1,13 +1,14 @@
 """
-bulletin - meteo multihazard - GFS025
-__date__ = '20230619'
-__version__ = '2.0.0'
+bulletin - meteo multihazard multimodel
+__date__ = '20230720'
+__version__ = '2.0.1'
 __author__ =
         'Andrea Libertino (andrea.libertino@cimafoundation.org',
 __library__ = 'bulletin'
 General command line:
 ### python fp_bulletin_meteo_gfs.py -settings_file "settings.json" -time "YYYY-MM-DD HH:MM"
 Version(s):
+20230720 (2.0.1) --> Added support for separate rain components
 20230629 (2.0.0) --> Rewritten to simplify multimodel and multi-exposure applications
 20230619 (1.2.2) --> Added possibility of choose what variables to consider
 20220615 (1.2.1) --> Fixed bug with realtive/absolute tresholds
@@ -42,9 +43,9 @@ import sys
 def main():
     # -------------------------------------------------------------------------------------
     # Version and algorithm information
-    alg_name = 'bulletin - Multihazard meteo warning for GFS '
-    alg_version = '1.2.2'
-    alg_release = '2023-06-19'
+    alg_name = 'bulletin - Multihazard multimodel meteo warning'
+    alg_version = '2.0.1'
+    alg_release = '2023-07-20'
     # -------------------------------------------------------------------------------------
 
     # -------------------------------------------------------------------------------------
@@ -69,6 +70,8 @@ def main():
     # Create directories
     template_time_step = fill_template_time_step(data_settings['algorithm']['template'], date_run)
     template_time_step["model"] = data_settings['data']["dynamic"]["model"]
+    template_time_step["hazard"] = "{hazard}"
+    template_time_step["HAZARD"] = "{HAZARD}"
 
     ancillary_folder = data_settings['data']['dynamic']['ancillary']['folder'].format(**template_time_step)
     ancillary_file = os.path.join(ancillary_folder, data_settings['data']['dynamic']['ancillary']['file_name']).format(**template_time_step)
@@ -175,20 +178,31 @@ def main():
     logging.info(" --> Postprocess specific variables...")
     processed_variables = {}
 
-    logging.info(" ---> Decumulate accumulated rainfall...")
-    if data_settings["data"]["dynamic"]["variables"]["rain"]["accumulated"] is True:
-        ds_decum = xr.concat([data['rain'][0:1,:,:], data['rain'].diff("time")], "time")
-        logging.info(" ---> Decumulate accumulated rainfall ...DONE!")
-    else:
-        logging.info(" ---> Rainfall is already at hourly time step! Skipping")
-        ds_decum = data['rain'].copy()
+    if "rain" in data_settings["algorithm"]["settings"]["hazards"]:
+        if "rainc" in data_settings["data"]["dynamic"]["variables"].keys() and "rainnc" in data_settings["data"]["dynamic"]["variables"].keys():
+            logging.info(" ---> Combine rainfall components...")
+            data["rain"] = data["rainc"] + data["rainnc"]
+            if data_settings["data"]["dynamic"]["variables"]["rainc"]["accumulated"] and data_settings["data"]["dynamic"]["variables"]["rainnc"]["accumulated"]:
+                data_settings["data"]["dynamic"]["variables"]["rain"] = {"accumulated": True}
+        elif "rain" in data_settings["data"]["dynamic"]["variables"].keys():
+            pass
+        else:
+            logging.error(" ERROR! Rain hazard is active! Rain forecast should be provided as 'rain' map or as 'rainc' and 'rainnc' components!")
+            raise NotImplementedError
 
-    logging.info(" ---> Cumulate with rolling window...")
-    steps_in_24_hours = int(24 / data_settings['data']['dynamic']['time']["forecast_resolution_h"])
-    processed_variables["rain"] = ds_decum.rolling(time=steps_in_24_hours, center=True).sum().shift(time=-1)
-    # This to avoid numerical approximation problems that could lead to negative values
-    processed_variables["rain"] = xr.where(processed_variables["rain"]<0,0,processed_variables["rain"])
-    logging.info(" ---> Cumulate with rolling window...DONE!")
+        logging.info(" ---> Decumulate accumulated rainfall...")
+        if data_settings["data"]["dynamic"]["variables"]["rain"]["accumulated"] is True:
+            ds_decum = xr.concat([data['rain'][0:1,:,:], data['rain'].diff("time")], "time")
+            logging.info(" ---> Decumulate accumulated rainfall ...DONE!")
+        else:
+            logging.info(" ---> Rainfall is already at hourly time step! Skipping")
+            ds_decum = data['rain'].copy()
+        logging.info(" ---> Cumulate with rolling window...")
+        steps_in_24_hours = int(24 / data_settings['data']['dynamic']['time']["forecast_resolution_h"])
+        processed_variables["rain"] = ds_decum.rolling(time=steps_in_24_hours, center=True).sum().shift(time=-1)
+        # This to avoid numerical approximation problems that could lead to negative values
+        processed_variables["rain"] = xr.where(processed_variables["rain"]<0,0,processed_variables["rain"])
+        logging.info(" ---> Cumulate with rolling window...DONE!")
 
     if "wind" in data_settings["algorithm"]["settings"]["hazards"]:
         logging.info(" ---> Merge wind components...")
