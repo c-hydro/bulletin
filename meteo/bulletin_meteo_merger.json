@@ -1,0 +1,71 @@
+{
+  "algorithm": {
+    "flags": {
+      "raise_error_if_missing": false
+    },
+    "general": {
+      "title": "Multihazard warning for Dewetra",
+      "web-site": "",
+      "source": "Python library developed by CIMA Research Foundation",
+      "history": "1.2.0 [20210812]",
+      "project-info": "fp-africa",
+      "algorithm": "Postprocessing tool developed by CIMA Research Foundation"
+    },
+    "template": {
+      "source_sub_path_time": "%Y/%m/%d/",
+      "ancillary_datetime": "%Y%m%d%H%M",
+      "forecast_datetime": "%Y%m%d%H",
+      "outcome_sub_path_time": "%Y/%m/%d/",
+      "outcome_datetime": "%Y%m%d%H%M",
+      "hmc_datetime_folder": "%Y/%m/%d/%H",
+      "hazard": "{hazard}",
+      "model": "{model}"
+    },
+    "settings": {
+      "hazards": [
+        "rain",
+        "wind"
+      ],
+      "hazards_short": [
+        "rain",
+        "wind"
+      ]
+    }
+  },
+  "data": {
+    "models": {
+      "gfs0p25": {
+        "weight": 0.2,
+        "file": "/home/andrea/Desktop/test_multimodel/gfs0p25/{source_sub_path_time}/{outcome_datetime}_impacts-adm1{HAZARD}-{model}.shp"
+      },
+      "ecmwf0p4": {
+        "weight": 0.4,
+        "file": "/home/andrea/Desktop/test_multimodel/nwp_beta/ecmwf/{source_sub_path_time}/{outcome_datetime}_impacts-adm1{HAZARD}-{model}.shp"
+      },
+      "icon0p125": {
+        "weight": 0.3,
+        "file": "/home/andrea/Desktop/test_multimodel/nwp_beta/dwd/{source_sub_path_time}//{outcome_datetime}_impacts-adm1{HAZARD}-{model}.shp"
+      },
+      "cmc-gdps0p15": {
+        "weight": 0.1,
+        "file": "/home/andrea/Desktop/test_multimodel/nwp_beta/cmc/{source_sub_path_time}//{outcome_datetime}_impacts-adm1{HAZARD}-{model}.shp"
+      }
+    },
+    "outcome": {
+      "file_name_shape_impacts": "{outcome_datetime}_multimodel-adm1{HAZARD}.shp",
+      "folder_shape_impacts": "/home/andrea/Desktop/test_multimodel/outcome/{source_sub_path_time}/"
+    },
+    "risk_thresholds": {
+      "absolute": [
+        10, 500, 10000, 50000
+      ],
+      "relative": [
+        null, null, 0.005, 0.05
+      ]
+    },
+    "log": {
+      "filename": "fp_africa_warning.txt",
+      "folder": "/home/andrea/Desktop/Working_dir/bulletin_impact/log/"
+    }
+  }
+}

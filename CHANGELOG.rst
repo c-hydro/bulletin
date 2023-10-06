@@ -1,6 +1,11 @@
 =========
 Changelog
 =========
+Version 2.0.1 [2023-09-01]
+**************************
+APP: **bulletin_meteo_merger.py**
+    - App to merge results from IBFs with different meteorological models
+
 Version 2.0.0 [2023-07-04]
 **************************
 APP: **bulletin_meteo_multimodel.py**
