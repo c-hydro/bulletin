@@ -1,11 +1,9 @@
 # bulletin
-*Multihazard bulletin warning tools*
 
-A set of tools for operational impact-based forecasting of climate-related hazards.
+**BULLETIN - Boîte à oUtils opérationneLLe pour la prÉvision des impacTs des rIsques Naturels** is a toolbox for the operational impact-based forecasting (IBF) of natural hazards.
 
-
-It consists of different functions for dealing with:
-- **Meteorological hazards**: supporting many meteorological models (NOAA-GFS, DWD-ICON, CMC-GEM, WRF) and easy to configure with local deterministic models in netcdf formats allow to assess the impact of forecasted meteorological variables like rainfall, wind and temperature.
+It consists of different tools for dealing with:
+- **Meteorological hazards**: natively supporting several global meteorological models (NOAA-GFS, DWD-ICON, CMC-GEM, ECMWF)  and easy to configure with local deterministic models in netcdf formats allow to assess the impact of forecasted meteorological variables like rainfall, wind and temperature.
 - **Hydrological hazards**: analyse the output of JRC-GLOFAS global open hydrological model or of local implementations of the FloodPROOFS CIMA flood monitoring system to assess the impact-based flood hazard
 - **Drought hazards**: analyse drought indexes provided as geotif files, to assess the impact of droughts
 
