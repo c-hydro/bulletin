@@ -1,6 +1,12 @@
 =========
 Changelog
 =========
+
+Version 2.0.2 [2024-01-09]
+**************************
+APP: **bulletin_drought_cdi.py**
+    - Updated for the operational version
+
 Version 2.0.1 [2023-09-01]
 **************************
 APP: **bulletin_meteo_merger.py**
