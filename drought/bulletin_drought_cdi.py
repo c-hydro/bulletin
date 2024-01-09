@@ -64,6 +64,15 @@ def main():
     # Create directories
     template_time_step = fill_template_time_step(data_settings['algorithm']['template'], date_run)
 
+    if date_run.day == 1:
+        template_time_step["map_num"] = "1st"
+    elif date_run.day == 11:
+        template_time_step["map_num"] = "2nd"
+    elif date_run.day == 21:
+        template_time_step["map_num"] = "3rd"
+    else:
+        raise NotImplementedError("Only the first 3 maps per month are supported")
+
     ancillary_folder = data_settings['data']['dynamic']['ancillary']['folder'].format(**template_time_step)
     ancillary_file_name = os.path.join(ancillary_folder,
                                        data_settings['data']['dynamic']['ancillary']['file_name']).format(**template_time_step)
@@ -86,7 +95,6 @@ def main():
     os.makedirs(output_folder_table_impacts, exist_ok=True)
     os.makedirs(output_folder_shape_impacts, exist_ok=True)
     os.makedirs(output_folder_shape_hazard, exist_ok=True)
-    os.makedirs(ancillary_folder, exist_ok=True)
     # -------------------------------------------------------------------------------------
     # Info algorithm
     logging.info(' ============================================================================ ')
@@ -132,6 +140,8 @@ def main():
         if not os.path.isfile(input_file):
             logging.error("ERROR! File " + input_file + " is not found!")
             raise FileNotFoundError
+        else:
+            logging.info(" --> File " + input_file + " is found!")
         data = xr.open_rasterio(input_file)
         logging.info(" --> Use of local available forecast...DONE")
     # -------------------------------------------------------------------------------------
@@ -158,6 +168,20 @@ def main():
 
     for val, th in enumerate(thresholds, start=2):
         alert_maps = np.where(data.values >= th, val, alert_maps)
+
+    alert_map_temp = deepcopy(alert_maps)
+
+    if data_settings["algorithm"]["flags"]["convert_hazard_classes"]:
+        logging.info(" ----> Convert hazard classes")
+        haz_class_out = np.ones(alert_map_temp.shape) * 0
+        dict_conversion = data_settings["data"]["static"]["conversion_table"]
+        for class_out in dict_conversion.keys():
+            classes_in = dict_conversion[class_out]
+            haz_class_out[np.isin(alert_map_temp, classes_in)] = int(class_out)
+        alert_maps = haz_class_out
+        logging.info(" ----> Convert hazard classes...DONE")
+
+    logging.info(" ----> Assign flood hazard level...DONE")
 
     logging.info(" --> Classify drought alert level...DONE")
     # -------------------------------------------------------------------------------------
@@ -201,10 +225,10 @@ def main():
     # -------------------------------------------------------------------------------------
     # Write output and clean
     logging.info(" --> Write output...")
-    alert_daily.to_netcdf(ancillary_file_name)
 
-    if data_settings["algorithm"]["flags"]["clear_ancillary_data"]:
-        os.system("rm " + ancillary_file_name)
+    if not data_settings["algorithm"]["flags"]["clear_ancillary_data"]:
+        os.makedirs(ancillary_folder, exist_ok=True)
+        make_tif(alert_maps.squeeze(), data.x.values, data.y.values, ancillary_file_name, dtype='int16')
 
     logging.info(" --> Write gridded output...DONE")
     # -------------------------------------------------------------------------------------
@@ -476,6 +500,15 @@ def classify_warning_levels_impact_based(hazard, out_name, shp_df, alert_daily, 
         logging.info(" ---> Save shapefile for " + hazard + " risk...DONE")
 
 # ----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
+def make_tif(val, lon, lat, out_filename, crs='epsg:4326', nodata=-9999, dtype='float32'):
+    out_ds = xr.DataArray(val, dims=["y", "x"], coords={"y": lat, "x": lon})
+    out_ds = out_ds.where(out_ds != nodata).rio.write_crs(crs, inplace=True).rio.write_nodata(nodata, inplace=True)
+    out_ds.values = out_ds.values.astype(dtype)
+    out_ds.rio.to_raster(out_filename, driver="GTiff", crs='EPSG:4326', height=len(lat), width=len(lon), dtype=out_ds.dtype, compress="DEFLATE")
+
+# -------------------------------------------------------------------------------------
 
 # ----------------------------------------------------------------------------
 # Call script from external library

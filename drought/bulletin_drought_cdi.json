@@ -5,7 +5,8 @@
       "mask_sea": false,
       "debug_mode": true,
       "hazard_assessment": false,
-      "impact_assessment": true
+      "impact_assessment": true,
+      "convert_hazard_classes": true
     },
     "general": {
       "title": "Drought with CDI",
@@ -16,7 +17,7 @@
       "algorithm": "Postprocessing tool developed by CIMA Research Foundation"
     },
     "template": {
-      "cdi_file_time": "%Y%m%d",
+      "cdi_file_time": "%Y_%b",
       "ancillary_sub_path_time": "%Y/%m/%d/",
       "ancillary_datetime": "%Y%m%d%H%M",
       "outcome_sub_path_time": "%Y/%m/%d/",
@@ -33,7 +34,13 @@
     "static": {
       "warning_regions": "/home/andrea/Projects/DATABASE/africa/adm_1_africa.shp",
       "sea_mask": "/home/andrea/CIMA/PROJECT_IGAD2/bulletin/raster/mask_sea.tif",
-      "drought_tresholds": [1,2,3]
+      "drought_tresholds": [4,7,11,13],
+      "conversion_table":
+      { "1": [5],
+        "2": [1],
+        "3": [2,4],
+        "4": [3]
+      }
     },
     "dynamic": {
       "bbox": {
@@ -45,13 +52,13 @@
       "input": {
         "local_file" : {
           "folder": "/home/andrea/Projects/UNDRR_AUC/drought/data/",
-          "file_name": "rdria_m_wld_{cdi_file_time}_t.tif"
+          "file_name": "cdi_{cdi_file_time}_{map_num}.tif"
         },
         "remote_file_path": "/home/andrea/Projects/UNDRR_AUC/drought/data/"
       },
       "ancillary": {
         "folder": "/home/andrea/Projects/UNDRR_AUC/drought/ancillary",
-        "file_name" : "classified_drought_map_{outcome_datetime}.nc"
+        "file_name" : "classified_drought_map_{outcome_datetime}.tif"
       },
       "outcome": {
         "file_name_shape_hazard": "{outcome_datetime}_drought.shp",
@@ -66,14 +73,14 @@
       "lack_coping_capacity_col": "LACK_CC",
       "exposed_population_map": "/home/andrea/Projects/DATABASE/GHS_POP_E2020_AFRICA_R2022_4326_resamp_9ss_V1_0.tif",
       "weight_hazard_levels": {
-        "drought": [0.02,0.2,0.5]
+        "drought": [0,0,1]
       },
       "risk_thresholds": {
         "absolute": [10,500,10000,50000],
         "relative": [null,null,0.005,0.05]},
       "impact_summary": {
         "save_impact_table": true,
-        "impact_table_aggregation_column": "NAME_0"
+        "impact_table_aggregation_column": "GID_0"
       }
     },
     "log": {
