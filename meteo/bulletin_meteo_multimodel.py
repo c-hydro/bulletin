@@ -236,6 +236,9 @@ def main():
             alert_daily = classify_hazard_with_maps(hazard, data_settings['data']['static']["tresholds"][hazard], ds_out_daily, alert_daily)
         elif  data_settings['data']['static']["tresholds"][hazard]["type"] == "value":
             alert_daily = classify_hazard_with_values(hazard, data_settings['data']['static']["tresholds"][hazard], ds_out_daily, alert_daily)
+        elif data_settings['data']['static']["tresholds"][hazard]["type"] == "value_inverse":
+            alert_daily = classify_hazard_with_values_inverse(hazard, data_settings['data']['static']["tresholds"][hazard], ds_out_daily, alert_daily)
+
         else:
             logging.error("ERROR! Treshold format not recognised! Choose either to use -map- or -value- setting")
             raise NotImplementedError
@@ -692,6 +695,18 @@ def classify_hazard_with_values(hazard, tresholds_settings, ds_out_daily, alert_
 
     for val, th in enumerate(thresholds, start=2):
         alert_maps = np.where(ds_out_daily[hazard].values >= th, val, alert_maps)
+
+    alert_daily[hazard].values = alert_maps
+    return alert_daily
+# ----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
+def classify_hazard_with_values_inverse(hazard, tresholds_settings, ds_out_daily, alert_daily):
+    thresholds = tresholds_settings['values'][::-1]
+    alert_maps = np.where(ds_out_daily[hazard].values >= 0, 1, np.nan)
+
+    for val, th in enumerate(thresholds, start=2):
+        alert_maps = np.where(ds_out_daily[hazard].values <= th, val, alert_maps)
 
     alert_daily[hazard].values = alert_maps
     return alert_daily
