@@ -1,13 +1,14 @@
 """
 bulletin - hydro - floodPROOFS
-__date__ = '20220615'
-__version__ = '1.0.1'
+__date__ = '20240111'
+__version__ = '1.0.2'
 __author__ =
         'Andrea Libertino (andrea.libertino@cimafoundation.org',
 __library__ = 'bulletin'
 General command line:
 ### python bulletin_hydro_fp.py -settings_file "settings.json" -time "YYYY-MM-DD HH:MM"
 Version(s):
+20240111 (1.0.2) --> Fix a bug related to the merging of the flood maps
 20220615 (1.0.1) --> Add adaptive name for hazard field
 20221121 (1.0.0) --> Beta release
 """
@@ -39,8 +40,8 @@ def main():
     # -------------------------------------------------------------------------------------
     # Version and algorithm information
     alg_name = 'bulletin - Hydrological warning with FloodProofs '
-    alg_version = '1.0.1'
-    alg_release = '2023-06-15'
+    alg_version = '1.0.2'
+    alg_release = '2024-01-11'
     # -------------------------------------------------------------------------------------
 
     # -------------------------------------------------------------------------------------
@@ -310,9 +311,9 @@ def create_flood_map(th_levels, impact_dict):
 
     for level, associated_rp in enumerate(impact_dict["flood_maps"]["associated_rp"], start=2):
         logging.info(' ---> Import hazard level ' + str(level))
-        flood_map_level = xr.open_rasterio(impact_dict["flood_maps"]["file_name"].format(return_period=str(associated_rp))).squeeze().astype(np.int32)
+        flood_map_level = xr.open_rasterio(impact_dict["flood_maps"]["file_name"].format(return_period=str(associated_rp))).squeeze().astype(np.int64)
         flood_map_level.values = check_raster(flood_map_level)
-        flood_map_level.values[flood_map_level.values > 99999] = 0
+        flood_map_level.values[flood_map_level.values > 999999] = 0
         flood_map_level.values[flood_map_level.values < 0] = 0
         if level==2:
             mosaic_flood_map = flood_map_level.copy()*0
@@ -436,7 +437,7 @@ def extract_max_hmc_results(out_hmc_path, date_start, date_end):
             logging.error(" ERROR! Output file " + file + " not found!")
             raise FileNotFoundError
         os.system("rm " + file)
-        
+
         if first_step:
             dis_max = map_now
             mask = np.where(file_now["SM"].values < 0, 0, 1)

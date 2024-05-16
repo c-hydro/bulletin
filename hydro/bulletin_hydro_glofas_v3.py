@@ -1,14 +1,13 @@
 """
-bulletin - hydro - GLOFAS
-__date__ = '20240517'
-__version__ = '2.0.0'
+bulletin - hydro - GLOFAS v3.0
+__date__ = '20220511'
+__version__ = '1.3.0'
 __author__ =
         'Andrea Libertino (andrea.libertino@cimafoundation.org',
 __library__ = 'bulletin'
 General command line:
 ### python fp_bulletin_hydro_glofas.py -settings_file "settings.json" -time "YYYY-MM-DD HH:MM"
 Version(s):
-20240517 (2.0.0) --> Update to GloFAS v4
 20220511 (1.3.0) --> Added production of mosaic flood area map
 20220329 (1.2.0) --> Merged hazard classes for rearcompatibility
 20220324 (1.1.0) --> Add impact-based assessment
@@ -22,8 +21,6 @@ import cdsapi
 import os
 import numpy as np
 import datetime as dt
-
-import pandas as pd
 import xarray as xr
 import geopandas as gpd
 from rasterio import features
@@ -38,16 +35,15 @@ import subprocess
 import random
 import string
 import rioxarray as rx
-from copy import deepcopy
 
 # -------------------------------------------------------------------------------------
 # Script Main
 def main():
     # -------------------------------------------------------------------------------------
     # Version and algorithm information
-    alg_name = 'bulletin - Hydrological warning with GLOFAS '
-    alg_version = '2.0.0'
-    alg_release = '2024-05-17'
+    alg_name = 'bulletin - Hydrological warning with GLOFAS v3.0'
+    alg_version = '1.3.0'
+    alg_release = '2022-05-11'
     # -------------------------------------------------------------------------------------
 
     # -------------------------------------------------------------------------------------
@@ -228,12 +224,13 @@ def main():
         impact_dict = data_settings["data"]["impacts"]
         impact_dict["return_periods"] = data_settings["data"]["static"]["discharge_thresholds"]["return_periods"]
         logging.info( "--> Mosaic flood maps..")
-        impact_dict["temp_folder"] = os.path.join(paths["ancillary"],"flood_maps","")
-        os.makedirs(impact_dict["temp_folder"], exist_ok=True)
-        #mosaic_weigthed_map = create_flood_map(th_levels, impact_dict)
-        mosaic_weigthed_map = os.path.join(impact_dict["temp_folder"], "flood_map_merged.tif")
-        logging.info(" --> Write flood map...")
-        os.system('gdal_calc.py -A ' + mosaic_weigthed_map + " --outfile=" + out_file_flood_tif + ' --calc="A/A" --type=Int16 --NoDataValue=0 --co="COMPRESS=DEFLATE" --overwrite')
+        mosaic_weigthed_map = create_flood_map(th_levels, impact_dict)
+        out_mask = mosaic_weigthed_map / mosaic_weigthed_map
+        out_mask.rio.write_crs("epsg:4326", inplace=True)
+        out_mask.rio.write_nodata(0, inplace=True)
+        out_mask.astype(np.int16).rio.to_raster(out_file_flood_tif, compress='DEFLATE', dtype='int16')
+        mosaic_weigthed_map.to_netcdf(os.path.join(paths["ancillary"], "flood_weight_map.nc"))
+        logging.info("--> Mosaic flood maps..DONE")
         logging.info("--> Classify warning levels..")
         classify_warning_levels_impact_based(shp_df_hydro_model, mosaic_weigthed_map, out_file_shp, impact_dict)
         logging.info("--> Classify warning levels..DONE")
@@ -326,30 +323,6 @@ def classify_warning_levels_pure_hazard(shp_df_hydro_model, th_levels, output_fi
         shp_df_hydro_model.to_file(output_file)
 # -------------------------------------------------------------------------------------
 
-def intersect_aoi(mosaic_flood_map, flood_map_level_name, aoi_map, level, codes_in):
-    logging.info(' ---> Open flood map for level')
-    flood_map_level = rx.open_rasterio(flood_map_level_name, cache=False).rio.clip_box(*aoi_map.rio.bounds()).squeeze()  # .astype(np.int16)
-    logging.info(' ---> Edit ranges')
-    flood_map_level = flood_map_level.reindex_like(aoi_map, method='nearest')
-    # if flood_map_level is > 99999 or <0 set to 0, else set to 1
-    flood_map_level.values = np.where((flood_map_level.values > 99999) | (flood_map_level.values < 0), 0, 1)
-
-    if level == 2:
-        logging.info(' ---> Create mosaic map')
-        mosaic_flood_map = (flood_map_level.copy() * 0).astype(np.int16)
-
-    #if level in np.unique(th_levels_reindex.values):
-    # select the codes in codes_per_level[level] that are in the domain according to the conversion table
-    # set to 0 the codes of ai_map that are not in codes_in
-    logging.info(' ---> Search values in AOI')
-    aoi_in = deepcopy(aoi_map)
-    aoi_in.values = np.where(np.isin(aoi_map.values, codes_in["hydro"].values), 1, 0)
-    logging.info(' ---> Mosaicing....')
-    mosaic_flood_map += flood_map_level.astype(np.int16) * level * aoi_in.astype(np.int16)
-
-    return mosaic_flood_map
-
-
 # -------------------------------------------------------------------------------------
 # Mosaic flood maps
 def create_flood_map(th_levels, impact_dict):
@@ -357,74 +330,26 @@ def create_flood_map(th_levels, impact_dict):
     decode_map = xr.open_rasterio(impact_dict["decode_map"]).squeeze()
     decode_map.values[decode_map.values <0] = -1
     th_levels_reindex = th_levels.reindex({"lon":decode_map.x.values, "lat":decode_map.y.values}, method='nearest')
-    conversion_table = pd.read_csv(impact_dict["aoi"]["decode_table"]["filename"], sep=",", usecols=[impact_dict["aoi"]["decode_table"]["col_flood"], impact_dict["aoi"]["decode_table"]["col_hydro"], impact_dict["aoi"]["decode_table"]["col_domain"]], names=["flood", "hydro", "domain"], header=0)
-    conversion_table = conversion_table[conversion_table["domain"].isin(np.unique(impact_dict["aoi"]["domains"]))]
-
-    logging.info(" --> Check area of interest to activate per level...")
-    codes_per_level = {}
 
     for level, associated_rp in enumerate(impact_dict["flood_maps"]["associated_rp"], start=2):
+        logging.info(' ---> Import hazard level ' + str(level))
+        flood_map_level = xr.open_rasterio(impact_dict["flood_maps"]["file_name"].format(return_period=str(associated_rp))).squeeze().astype(np.int32)
+        flood_map_level.values[flood_map_level.values>99999] = 0
+        flood_map_level.values[flood_map_level.values <0] = 0
+        if level==2:
+            mosaic_flood_map = flood_map_level.copy()*0
         if level in np.unique(th_levels_reindex.values):
-            codes_per_level[level] = [i for i in decode_map.values[th_levels_reindex == level] if i>-1 and i in conversion_table["hydro"].values]
-        else:
-            codes_per_level[level] = []
+            codes_in = decode_map.values[th_levels_reindex==level]
+            codes_in = codes_in[codes_in>0]
+            flood_map_level.values[np.isin(flood_map_level.values,codes_in,invert=True)] = 0
+            mosaic_flood_map = xr.where(flood_map_level>1,level,mosaic_flood_map)
 
-    logging.info(" --> Looping trough domains for making flood map...")
-    for aoi in impact_dict["aoi"]["domains"]:
-        logging.info(' ---> Computing domain ' + str(aoi))
-        aoi_map = impact_dict["aoi"]["domain_map"].format(domain=aoi)
-        aoi_map = xr.open_rasterio(aoi_map, cache=False).squeeze()   #.astype(np.int32)
-        aoi_map.values[aoi_map.values < 0] = 0
-        aoi_maps = {}
+    mosaic_weigthed_map = mosaic_flood_map.copy()
+    mosaic_weigthed_map.values = mosaic_weigthed_map.values*0
+    for key, level in enumerate(impact_dict["weight_hazard_levels"],start=2):
+        mosaic_weigthed_map.values = np.where(mosaic_flood_map.values == key, level, mosaic_weigthed_map.values )
 
-        if aoi_map.sizes["x"] * aoi_map.sizes["y"] > 1000000000:
-            logging.info(" --> Very large domain, split in 4 parts")
-            aoi_maps[0] = aoi_map.isel(x=slice(0, int(aoi_map.sizes["x"]/2)), y=slice(0, int(aoi_map.sizes["y"]/2)))
-            aoi_maps[1] = aoi_map.isel(x=slice(int(aoi_map.sizes["x"]/2), aoi_map.sizes["x"]), y=slice(0, int(aoi_map.sizes["y"]/2)))
-            aoi_maps[2] = aoi_map.isel(x=slice(0, int(aoi_map.sizes["x"]/2)), y=slice(int(aoi_map.sizes["y"]/2), aoi_map.sizes["y"]))
-            aoi_maps[3] = aoi_map.isel(x=slice(int(aoi_map.sizes["x"]/2), aoi_map.sizes["x"]), y=slice(int(aoi_map.sizes["y"]/2), aoi_map.sizes["y"]))
-        elif aoi_map.sizes["x"] * aoi_map.sizes["y"] > 800000000:
-            logging.info(" --> Large domain, split in 3 parts")
-            aoi_maps[0] = aoi_map.isel(x=slice(0, int(aoi_map.sizes["x"]/2)), y=slice(0, int(aoi_map.sizes["y"]/2)))
-            aoi_maps[1] = aoi_map.isel(x=slice(int(aoi_map.sizes["x"]/2), aoi_map.sizes["x"]), y=slice(0, int(aoi_map.sizes["y"]/2)))
-            aoi_maps[2] = aoi_map.isel(x=slice(0, int(aoi_map.sizes["x"]/2)), y=slice(int(aoi_map.sizes["y"]/2), aoi_map.sizes["y"]))
-        elif aoi_map.sizes["x"] * aoi_map.sizes["y"] > 600000000:
-            logging.info(" --> Quite large domain, split in 2 parts")
-            aoi_maps[0] = aoi_map.isel(x=slice(0, int(aoi_map.sizes["x"]/2)), y=slice(0, aoi_map.sizes["y"]))
-            aoi_maps[1] = aoi_map.isel(x=slice(int(aoi_map.sizes["x"]/2), aoi_map.sizes["x"]), y=slice(0, aoi_map.sizes["y"]))
-        else:
-            aoi_maps[0] = aoi_map
-            logging.info(" --> Small domain, process as a whole")
-
-        for group in aoi_maps.keys():
-            logging.info(" ---> Processing part " + str(group+1) + " of " + str(len(aoi_maps)))
-            mosaic_flood_map = None
-            for level, associated_rp in enumerate(impact_dict["flood_maps"]["associated_rp"], start=2):
-                logging.info(' ----> Import hazard level ' + str(level))
-                logging.info(' ----> Find codes in')
-                codes_in = conversion_table.loc[(conversion_table["hydro"].isin(codes_per_level[level])) & (conversion_table["domain"] == aoi)]
-                # Load and clip the flood map
-                if level == 2 or len(codes_in) > 0:
-                    flood_map_level_name = impact_dict["flood_maps"]["file_name"].format(return_period=str(associated_rp), domain=aoi)
-                    mosaic_flood_map = intersect_aoi(mosaic_flood_map, flood_map_level_name, aoi_maps[group], level, codes_in)
-                else:
-                    logging.info(' ---> No codes in domain ' + str(aoi) + ' for level ' + str(level))
-            mosaic_flood_map.rio.write_crs("epsg:4326", inplace=True)
-            mosaic_flood_map.rio.write_nodata(0, inplace=True)
-            logging.info(" --> All levels processed for the domain, now apply the weights...")
-            mosaic_weigthed_map = mosaic_flood_map.copy()
-            mosaic_weigthed_map.values = mosaic_weigthed_map.values * 0
-            for key, level in enumerate(impact_dict["weight_hazard_levels"], start=2):
-                mosaic_weigthed_map.values = np.where(mosaic_flood_map.values == key, level, mosaic_weigthed_map.values)
-            logging.info(' ---> Computing domain ' + str(aoi) + '...DONE')
-
-            logging.info(' ---> Save mosaic flood map in the ancillary folder')
-            mosaic_flood_map.astype(np.int16).rio.to_raster(os.path.join(impact_dict["temp_folder"], "flood_map_{domain}_{key_group}.tif").format(domain=aoi, key_group=str(group)),compress='DEFLATE', dtype='int16')
-
-    logging.info(" --> Merging the flood maps")
-    os.system("gdal_merge.py -o " + os.path.join(impact_dict["temp_folder"], "flood_map_merged.tif") + " " + impact_dict["temp_folder"] + "flood_map_*.tif -ot Int16 -co COMPRESS=DEFLATE -co BIGTIFF=YES -n 0")
-
-    return os.path.join(impact_dict["temp_folder"], "flood_map_merged.tif") #rx.open_rasterio(os.path.join(impact_dict["temp_folder"], "flood_map_merged.tif")).squeeze()
+    return mosaic_weigthed_map.astype(np.float32)
 
 # -------------------------------------------------------------------------------------
 
@@ -447,7 +372,6 @@ def classify_warning_levels_impact_based(shp_df, mosaic_flood_map, out_file_shp,
             logging.info(" ----> Computing zone " + str(index +1) + " of " + str(len(shp_df_step)))
             bbox = row["geometry"].bounds
             try:
-                clipped_flood = rx.open_rasterio(mosaic_flood_map).rio.clip_box(minx=bbox[0],miny=bbox[1],maxx=bbox[2],maxy=bbox[3])
                 clipped_pop = rx.open_rasterio(impact_dict["exposed_map"]).rio.clip_box(minx=bbox[0],miny=bbox[1],maxx=bbox[2],maxy=bbox[3])
             except rx.exceptions.NoDataInBounds:
                 logging.warning("WARNING! No data in selected bounding box! Is the geometry out of the raster domain?")
@@ -459,7 +383,7 @@ def classify_warning_levels_impact_based(shp_df, mosaic_flood_map, out_file_shp,
             clipped_pop.values[clipped_pop.values<0] = 0
             lon_bbox = clipped_pop.x.values
             lat_bbox = clipped_pop.y.values
-            alert_bbox = clipped_flood.reindex({"x":lon_bbox, "y":lat_bbox}, method="nearest")
+            alert_bbox = mosaic_flood_map.reindex({"x":lon_bbox, "y":lat_bbox}, method="nearest")
             country_bbox = rasterize([(row['geometry'], index+1)], {"lon":lon_bbox, "lat":lat_bbox})
 
             weigth_map = np.where((country_bbox==index+1),alert_bbox.values,np.nan)
