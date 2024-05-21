@@ -230,10 +230,9 @@ def main():
         logging.info( "--> Mosaic flood maps..")
         impact_dict["temp_folder"] = os.path.join(paths["ancillary"],"flood_maps","")
         os.makedirs(impact_dict["temp_folder"], exist_ok=True)
-        #mosaic_weigthed_map = create_flood_map(th_levels, impact_dict)
-        mosaic_weigthed_map = os.path.join(impact_dict["temp_folder"], "flood_map_merged.tif")
+        mosaic_weigthed_map = create_flood_map(th_levels, impact_dict)
         logging.info(" --> Write flood map...")
-        os.system('gdal_calc.py -A ' + mosaic_weigthed_map + " --outfile=" + out_file_flood_tif + ' --calc="A/A" --type=Int16 --NoDataValue=0 --co="COMPRESS=DEFLATE" --overwrite')
+        os.system('gdal_calc.py -A ' + mosaic_weigthed_map + " --outfile=" + out_file_flood_tif + ' --calc="A/A" --type=Byte --NoDataValue=0 --co="COMPRESS=DEFLATE" --overwrite --quiet')
         logging.info("--> Classify warning levels..")
         classify_warning_levels_impact_based(shp_df_hydro_model, mosaic_weigthed_map, out_file_shp, impact_dict)
         logging.info("--> Classify warning levels..DONE")
@@ -332,7 +331,7 @@ def intersect_aoi(mosaic_flood_map, flood_map_level_name, aoi_map, level, codes_
     logging.info(' ---> Edit ranges')
     flood_map_level = flood_map_level.reindex_like(aoi_map, method='nearest')
     # if flood_map_level is > 99999 or <0 set to 0, else set to 1
-    flood_map_level.values = np.where((flood_map_level.values > 99999) | (flood_map_level.values < 0), 0, 1)
+    flood_map_level.values = np.where((flood_map_level.values > 99999) | (flood_map_level.values <= 0) | np.isnan(flood_map_level.values), 0, 1)
 
     if level == 2:
         logging.info(' ---> Create mosaic map')
@@ -373,8 +372,9 @@ def create_flood_map(th_levels, impact_dict):
     for aoi in impact_dict["aoi"]["domains"]:
         logging.info(' ---> Computing domain ' + str(aoi))
         aoi_map = impact_dict["aoi"]["domain_map"].format(domain=aoi)
-        aoi_map = xr.open_rasterio(aoi_map, cache=False).squeeze()   #.astype(np.int32)
-        aoi_map.values[aoi_map.values < 0] = 0
+        aoi_map = rx.open_rasterio(aoi_map, cache=False).squeeze()   #.astype(np.int32)
+        aoi_map.rio.write_nodata(-9999, inplace=True)
+        aoi_map.values[(aoi_map.values < 0) | (np.isnan(aoi_map.values))] = 0
         aoi_maps = {}
 
         if aoi_map.sizes["x"] * aoi_map.sizes["y"] > 1000000000:
