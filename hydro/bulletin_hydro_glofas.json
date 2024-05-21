@@ -80,7 +80,7 @@
       "exposed_map": "/home/andrea/Desktop/Working_dir/GLOFASv4/data/GHS_POP_E2025_africa_wgs84.tif",
       "decode_map": "/home/andrea/Desktop/Working_dir/GLOFASv4/data/decode_map_africa.tif",
       "aoi": {
-        "domains": ["N_Interior" ,"Nile", "Congo", "EastCoast", "Senegal", "S_Interior", "LakeChad", "Niger", "Madagascar",  "Zambezi", "MedCoast", "WestCoast", "ShebJuba", "IndiOcean", "Orange", "Volta", "AngolaC", "Limpopo", "SA_WCoast", "SA_SCoast", "GuineaGulf", "Namibia", "NWCoast", "RiftValley", "RedSea"],
+        "domains": ["EastCoast", "N_Interior" ,"Nile", "Congo",  "Senegal", "S_Interior", "LakeChad", "Niger", "Madagascar",  "Zambezi", "MedCoast", "WestCoast", "ShebJuba", "IndiOcean", "Orange", "Volta", "AngolaC", "Limpopo", "SA_WCoast", "SA_SCoast", "GuineaGulf", "Namibia", "NWCoast", "RiftValley", "RedSea"],
         "domain_map": "/home/andrea/Desktop/Working_dir/GLOFASv4/data/AOI/AoI_{domain}.tif",
         "decode_table":
           {"filename": "/home/andrea/Desktop/Working_dir/GLOFASv4/data/GloFAS_IDs_singleIndex.csv",
@@ -91,7 +91,7 @@
       },
       "flood_maps": {
         "file_name": "/home/andrea/Desktop/Working_dir/GLOFASv4/data/maps/Africa_RP{return_period}_filled_depth.tif",
-        "associated_rp": [2,5,10,20,50,100,200,500]
+        "associated_rp": [10,10,10,20,50,100,200,500]
       },
       "weight_hazard_levels": [0.02,0.1,0.5,1,1,1,1,1],
       "risk_thresholds": {
