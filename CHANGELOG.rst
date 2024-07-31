@@ -1,6 +1,18 @@
 =========
 Changelog
 =========
+Version 4.0.0 [2024-07-31]
+**************************
+APP: **bulletin_hydro_fp-evr.py**
+    - Implemented a new approach for IBF with FloodPROOFS, based on pre-computed impacts at the MUL level
+
+Version 3.0.0 [2024-05-17]
+**************************
+APP: **bulletin_hydro_glofas.py**
+    - Update to GLOFAS 4.0
+
+APP: **bulletin_hydro_glofas_v3.py**
+    - Renamed for retrocompatibility
 
 Version 2.0.2 [2024-01-09]
 **************************
