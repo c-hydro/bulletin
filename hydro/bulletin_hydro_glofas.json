@@ -80,7 +80,7 @@
       "exposed_map": "/home/andrea/Desktop/Working_dir/GLOFASv4/data/GHS_POP_E2025_africa_wgs84.tif",
       "decode_map": "/home/andrea/Desktop/Working_dir/GLOFASv4/data/decode_map_africa.tif",
       "aoi": {
-        "domains": ["EastCoast", "N_Interior" ,"Nile", "Congo",  "Senegal", "S_Interior", "LakeChad", "Niger", "Madagascar",  "Zambezi", "MedCoast", "WestCoast", "ShebJuba", "IndiOcean", "Orange", "Volta", "AngolaC", "Limpopo", "SA_WCoast", "SA_SCoast", "GuineaGulf", "Namibia", "NWCoast", "RiftValley", "RedSea"],
+        "domains": ["ShebJuba", "IndiOcean"],
         "domain_map": "/home/andrea/Desktop/Working_dir/GLOFASv4/data/AOI/AoI_{domain}.tif",
         "decode_table":
           {"filename": "/home/andrea/Desktop/Working_dir/GLOFASv4/data/GloFAS_IDs_singleIndex.csv",

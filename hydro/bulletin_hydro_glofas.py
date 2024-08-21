@@ -1,13 +1,16 @@
 """
 bulletin - hydro - GLOFAS
-__date__ = '20240517'
-__version__ = '2.0.0'
+__date__ = '20240820'
+__version__ = '2.1.0'
 __author__ =
         'Andrea Libertino (andrea.libertino@cimafoundation.org',
 __library__ = 'bulletin'
 General command line:
 ### python fp_bulletin_hydro_glofas.py -settings_file "settings.json" -time "YYYY-MM-DD HH:MM"
 Version(s):
+20240820 (2.1.0) --> Update to new Copernicus CDS
+                     Fixex bug for maps weighted less than 1
+
 20240517 (2.0.0) --> Update to GloFAS v4
 20220511 (1.3.0) --> Added production of mosaic flood area map
 20220329 (1.2.0) --> Merged hazard classes for rearcompatibility
@@ -46,8 +49,8 @@ def main():
     # -------------------------------------------------------------------------------------
     # Version and algorithm information
     alg_name = 'bulletin - Hydrological warning with GLOFAS '
-    alg_version = '2.0.0'
-    alg_release = '2024-05-17'
+    alg_version = '2.1.0'
+    alg_release = '2024-08-20'
     # -------------------------------------------------------------------------------------
 
     # -------------------------------------------------------------------------------------
@@ -162,7 +165,7 @@ def main():
         dis_max = xr.open_dataset(nc_avg_name.format(perturbationNumber="*", step=step))["dis24"].squeeze()
 
         if first_step == True:
-            area = xr.open_rasterio(data_settings['data']['static']['area']).reindex(
+            area = rx.open_rasterio(data_settings['data']['static']['area']).reindex(
                 {"x": dis_max.lon.values, "y": dis_max.lat.values}, method='nearest').squeeze()
             mask = np.where(area>=data_settings["data"]["dynamic"]["thresholds"]["area_km2"],1,0)
             alert_map = np.ones(area.shape)
@@ -170,11 +173,11 @@ def main():
             first_step = False
 
         for val, rp in enumerate(data_settings["data"]["static"]["discharge_thresholds"]["return_periods"], start=2):
-            th_map = xr.open_rasterio(os.path.join(data_settings["data"]["static"]["discharge_thresholds"]["folder"],
+            th_map = rx.open_rasterio(os.path.join(data_settings["data"]["static"]["discharge_thresholds"]["folder"],
                                                    data_settings["data"]["static"]["discharge_thresholds"][
                                                        "file_name"]).format(domain=None, return_period=rp)).reindex(
                 {"x": dis_max.lon.values, "y": dis_max.lat.values}, method='nearest').squeeze()
-            th_map.values[th_map.values <= 0] = np.Inf
+            th_map.values[th_map.values <= 0] = np.inf
             alert_map = np.where((dis_max.values >= th_map.values) & (dis_max.values >= data_settings["data"]["dynamic"]["thresholds"]["discharge_min"]), val, alert_map)
         alert_level_days[step] = np.where(mask == 1, alert_map, 0)
 
@@ -230,9 +233,9 @@ def main():
         logging.info( "--> Mosaic flood maps..")
         impact_dict["temp_folder"] = os.path.join(paths["ancillary"],"flood_maps","")
         os.makedirs(impact_dict["temp_folder"], exist_ok=True)
-        mosaic_weigthed_map = create_flood_map(th_levels, impact_dict)
+        mosaic_flood_map, mosaic_weigthed_map = create_flood_map(th_levels, impact_dict)
         logging.info(" --> Write flood map...")
-        os.system('gdal_calc.py -A ' + mosaic_weigthed_map + " --outfile=" + out_file_flood_tif + ' --calc="A/A" --type=Byte --NoDataValue=0 --co="COMPRESS=DEFLATE" --overwrite --quiet')
+        os.system('gdal_calc.py -A ' + mosaic_flood_map + " --outfile=" + out_file_flood_tif + ' --calc="A/A" --type=Byte --NoDataValue=0 --co="COMPRESS=DEFLATE" --overwrite --quiet')
         logging.info("--> Classify warning levels..")
         classify_warning_levels_impact_based(shp_df_hydro_model, mosaic_weigthed_map, out_file_shp, impact_dict)
         logging.info("--> Classify warning levels..DONE")
@@ -353,7 +356,7 @@ def intersect_aoi(mosaic_flood_map, flood_map_level_name, aoi_map, level, codes_
 # Mosaic flood maps
 def create_flood_map(th_levels, impact_dict):
     logging.info(" --> Tailoring flood map")
-    decode_map = xr.open_rasterio(impact_dict["decode_map"]).squeeze()
+    decode_map = rx.open_rasterio(impact_dict["decode_map"]).squeeze()
     decode_map.values[decode_map.values <0] = -1
     th_levels_reindex = th_levels.reindex({"lon":decode_map.x.values, "lat":decode_map.y.values}, method='nearest')
     conversion_table = pd.read_csv(impact_dict["aoi"]["decode_table"]["filename"], sep=",", usecols=[impact_dict["aoi"]["decode_table"]["col_flood"], impact_dict["aoi"]["decode_table"]["col_hydro"], impact_dict["aoi"]["decode_table"]["col_domain"]], names=["flood", "hydro", "domain"], header=0)
@@ -412,19 +415,23 @@ def create_flood_map(th_levels, impact_dict):
             mosaic_flood_map.rio.write_crs("epsg:4326", inplace=True)
             mosaic_flood_map.rio.write_nodata(0, inplace=True)
             logging.info(" --> All levels processed for the domain, now apply the weights...")
-            mosaic_weigthed_map = mosaic_flood_map.copy()
-            mosaic_weigthed_map.values = mosaic_weigthed_map.values * 0
+            mosaic_weigthed_map = mosaic_flood_map.copy().astype(np.float32)
+            mosaic_weigthed_map.values = mosaic_weigthed_map.values * 0.0
             for key, level in enumerate(impact_dict["weight_hazard_levels"], start=2):
                 mosaic_weigthed_map.values = np.where(mosaic_flood_map.values == key, level, mosaic_weigthed_map.values)
             logging.info(' ---> Computing domain ' + str(aoi) + '...DONE')
 
             logging.info(' ---> Save mosaic flood map in the ancillary folder')
             mosaic_flood_map.astype(np.int16).rio.to_raster(os.path.join(impact_dict["temp_folder"], "flood_map_{domain}_{key_group}.tif").format(domain=aoi, key_group=str(group)),compress='DEFLATE', dtype='int16')
+            mosaic_weigthed_map.astype(np.float32).rio.to_raster(os.path.join(impact_dict["temp_folder"], "weight_map_{domain}_{key_group}.tif").format(domain=aoi, key_group=str(group)),compress='DEFLATE', dtype='float32')
 
     logging.info(" --> Merging the flood maps")
     os.system("gdal_merge.py -o " + os.path.join(impact_dict["temp_folder"], "flood_map_merged.tif") + " " + impact_dict["temp_folder"] + "flood_map_*.tif -ot Int16 -co COMPRESS=DEFLATE -co BIGTIFF=YES -n 0")
 
-    return os.path.join(impact_dict["temp_folder"], "flood_map_merged.tif") #rx.open_rasterio(os.path.join(impact_dict["temp_folder"], "flood_map_merged.tif")).squeeze()
+    logging.info(" --> Merging the weight maps")
+    os.system("gdal_merge.py -o " + os.path.join(impact_dict["temp_folder"], "weight_map_merged.tif") + " " + impact_dict["temp_folder"] + "weight_map_*.tif -ot Float32 -co COMPRESS=DEFLATE -co BIGTIFF=YES -n 0")
+
+    return os.path.join(impact_dict["temp_folder"], "flood_map_merged.tif"), os.path.join(impact_dict["temp_folder"], "weight_map_merged.tif") #rx.open_rasterio(os.path.join(impact_dict["temp_folder"], "flood_map_merged.tif")).squeeze()
 
 # -------------------------------------------------------------------------------------
 
@@ -593,17 +600,17 @@ def download_from_cds(date_now, dict_filled, data_settings, paths):
     c.retrieve(
     'cems-glofas-forecast',
     {
-         'system_version': 'operational',
+         'system_version': ['operational'],
          'variable': 'river_discharge_in_the_last_24_hours',
-         'hydrological_model': 'lisflood',
-         'format': 'grib',
+         'hydrological_model': ['lisflood'],
+         'format': 'grib2',
          'product_type': ['control_forecast', 'ensemble_perturbed_forecasts'],
-         'year': str(date_now.year),
-         'month': str(date_now.month).zfill(2),
-         'day': str(date_now.day).zfill(2),
+         'year': [str(date_now.year)],
+         'month': [str(date_now.month).zfill(2)],
+         'day': [str(date_now.day).zfill(2)],
          'leadtime_hour': time_steps,
          'area': bounding_box,
-         'nocache':rand_str
+         'download_format': 'unarchived'
     },
     forecast_file)
     logging.info(" ---> Download glofas forecast from CDS...DONE")
