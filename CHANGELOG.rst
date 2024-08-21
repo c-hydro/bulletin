@@ -1,10 +1,13 @@
 =========
 Changelog
 =========
-Version 4.0.0 [2024-07-31]
+Version 4.0.0 [2024-08-20]
 **************************
 APP: **bulletin_hydro_fp-evr.py**
     - Implemented a new approach for IBF with FloodPROOFS, based on pre-computed impacts at the MUL level
+
+APP: **bulletin_hydro_glofas.py**
+    - Update to new Copernicus API
 
 Version 3.0.0 [2024-05-17]
 **************************
