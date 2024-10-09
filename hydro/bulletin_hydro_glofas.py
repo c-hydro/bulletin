@@ -458,10 +458,10 @@ def classify_warning_levels_impact_based(shp_df, mosaic_flood_map, out_file_shp,
                 clipped_pop = rx.open_rasterio(impact_dict["exposed_map"]).rio.clip_box(minx=bbox[0],miny=bbox[1],maxx=bbox[2],maxy=bbox[3])
             except rx.exceptions.NoDataInBounds:
                 logging.warning("WARNING! No data in selected bounding box! Is the geometry out of the raster domain?")
-                shp_df_step.at[index, hazard + "_level"] = -1
-                shp_df_step.at[index, hazard + "AffPpl"] = -1
-                shp_df_step.at[index, hazard + "AffPrc"] = -1
-                shp_df_step.at[index, "pop_total"] = -1
+                shp_df_step.at[index, hazard + "_level"] = 0
+                shp_df_step.at[index, hazard + "AffPpl"] = 0
+                shp_df_step.at[index, hazard + "AffPrc"] = 0
+                shp_df_step.at[index, "pop_total"] = 0
                 continue
             clipped_pop.values[clipped_pop.values<0] = 0
             lon_bbox = clipped_pop.x.values
