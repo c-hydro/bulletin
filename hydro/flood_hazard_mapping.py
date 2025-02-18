@@ -41,11 +41,17 @@ class FloodHazardMerge:
         section_gdf = self.assign_return_periods(section_gdf, rp_raster)
 
         levels_sections = {}
+        available_rps = np.array(self.return_periods)
+
+        # Convert the raster of return periods to the available ones
+        section_gdf['T'] = section_gdf['T'].apply(
+            lambda T: available_rps[available_rps <= T].max() if T > 1 and not np.isnan(T) else T)
 
         first_map = True
         for T in np.unique(section_gdf["T"]):
             if T <= 1 or np.isnan(T):
                 continue
+
             logging.info(f'Import maps for RP {int(T)} years')
             flood_map_level = self.import_flood_map_level(T)
             if first_map:

@@ -142,7 +142,7 @@ class CalculateFloodReturnPeriod:
         results, mask, lon, lat = self.extract_hmc_results(date_now, forecast_end)
         dis_max = self.calculate_max_forecast(results)
         theta1_map, theta2_map, theta3_map, average_max_map, area_map, areacell_map = self.read_spatial_maps()
-        rp = self.calculate_return_period(dis_max, theta1_map, theta2_map, theta3_map, average_max_map, area_map, areacell_map) + 1
+        rp = self.calculate_return_period(dis_max, theta1_map, theta2_map, theta3_map, average_max_map, area_map, areacell_map)
         self.save_results(dis_max, rp, lon, lat, date_now)
         IOHandler.clear_ancillary_folder(self.ancillary_folder, self.clear_ancillary_flag)
         return format_path_with_time(os.path.join(self.outcome_folder, self.outcome_filename), date_now)
