@@ -1,0 +1,131 @@
+{
+  "flags": {
+    "clear_ancillary": false,
+    "debug": false
+  },
+  "settings":{
+    "domain": "IGAD_D2",
+    "forecast_length_h": 120,
+    "tresholds": {
+      "area_km": 100,
+      "discharge_min": 1,
+      "backup_T": 5
+    },
+    "distribution": "GEV"
+  },
+  "static_data": {
+    "hydro": {
+    "areacell": "/home/andrea/Desktop/Working_dir/IGAD_IBF/STATIC/{domain}.areacell.txt",
+    "area": "/home/andrea/Desktop/Working_dir/IGAD_IBF/STATIC/{domain}.area.txt",
+    "average_max": "/home/andrea/Desktop/Working_dir/IGAD_IBF/EVA/output/{domain}_avg-max.tif",
+    "parameters": {
+      "theta1": "/home/andrea/Desktop/Working_dir/IGAD_IBF/EVA/output/{domain}_theta1.tif",
+      "theta2": "/home/andrea/Desktop/Working_dir/IGAD_IBF/EVA/output/{domain}_theta2.tif",
+      "theta3": "/home/andrea/Desktop/Working_dir/IGAD_IBF/EVA/output/{domain}_theta3.tif"
+    }
+    },
+    "hazard": {
+        "return_period": [1, 2, 5, 10, 20, 50, 100],
+        "flood_maps": "/home/andrea/Desktop/Working_dir/IGAD_IBF/HAZMAPS/REGION/Hazmap__T{return_period:04d}.tif",
+        "section_file": {
+          "file_name": "/home/andrea/Desktop/Working_dir/IGAD_IBF/static_IBF/sezioni_IGAD.shp",
+          "field": "areacomp"
+        },
+        "decode_map": "/home/andrea/Desktop/Working_dir/IGAD_IBF/static_IBF/areecomp_IGAD_MERGED_reindex.tif"
+    },
+    "impacts": {
+      "admin": {
+        "subdomains": ["BDI","DJI","ERI"],
+        "shapefile": {
+          "filename": "/home/andrea/Desktop/Working_dir/IGAD_IBF/static_IBF/admin-1.shp",
+          "admin_column": "CODE_ADM"
+        },
+        "hydro_to_admin_table": {
+          "filename": "/home/andrea/Desktop/Working_dir/IGAD_IBF/LOT/{subdomain}/mul-admin-sezioni.csv",
+          "mul_column": "mul_id",
+          "admin_column": "adm1_code",
+          "hydro_column": "sezione",
+          "defense_column": "RP_Difesa"
+        }
+      },
+      "MUL": {
+        "population": {
+          "files" : ["/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL/pop2020/ALL/num/mul/{mul}.csv"]
+        },
+        "built": {
+          "files":
+            {
+              "gov": [
+                "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL//built-up-C1/Governmental/valfis/mul/{mul}.csv",
+                "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL//built-up-M1/Governmental/valfis/mul/{mul}.csv",
+                "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL//built-up-M2/Governmental/valfis/mul/{mul}.csv",
+                "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL//built-up-W1/Governmental/valfis/mul/{mul}.csv",
+                "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL//built-up-T1/Governmental/valfis/mul/{mul}.csv"
+              ],
+              "resLow": [
+                "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL//built-up-C1/Residential_low_income/valfis/mul/{mul}.csv",
+                "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL//built-up-M1/Residential_low_income/valfis/mul/{mul}.csv",
+                "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL//built-up-M2/Residential_low_income/valfis/mul/{mul}.csv",
+                "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL//built-up-W1/Residential_low_income/valfis/mul/{mul}.csv",
+                "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL//built-up-T1/Residential_low_income/valfis/mul/{mul}.csv"
+              ],
+              "resMH": [
+                "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL//built-up-C1/Residential_Medium_High_income/valfis/mul/{mul}.csv",
+                "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL//built-up-M1/Residential_Medium_High_income/valfis/mul/{mul}.csv",
+                "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL//built-up-M2/Residential_Medium_High_income/valfis/mul/{mul}.csv",
+                "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL//built-up-W1/Residential_Medium_High_income/valfis/mul/{mul}.csv",
+                "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL//built-up-T1/Residential_Medium_High_income/valfis/mul/{mul}.csv"
+              ],
+              "serv": [
+                "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL//built-up-C1/Services/valfis/mul/{mul}.csv",
+                "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL//built-up-M1/Services/valfis/mul/{mul}.csv",
+                "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL//built-up-M2/Services/valfis/mul/{mul}.csv",
+                "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL//built-up-W1/Services/valfis/mul/{mul}.csv",
+                "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL//built-up-T1/Services/valfis/mul/{mul}.csv"
+              ],
+              "ind": [
+                "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL//built-up-C1/Industrial/valfis/mul/{mul}.csv",
+                "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL//built-up-M1/Industrial/valfis/mul/{mul}.csv",
+                "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL//built-up-M2/Industrial/valfis/mul/{mul}.csv",
+                "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL//built-up-W1/Industrial/valfis/mul/{mul}.csv",
+                "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL//built-up-T1/Industrial/valfis/mul/{mul}.csv"
+              ]
+            }
+        }
+      }
+    },
+    "classification": {
+      "population": {
+        "absolute_values": "pop_tot",
+        "thresholds": {
+          "absolute": [-1, 1, null, null],
+          "relative": [null, null, 0.005, 0.05]
+        }
+      }
+    }
+  },
+  "input": {
+    "hmc_output": "/home/andrea/Desktop/Working_dir/IGAD_IBF/test_data/%Y/%m/%d/%H/outcome/deterministic/"
+  },
+  "ancillary":  {
+    "folder" :  "/home/andrea/Desktop/Working_dir/IGAD_IBF/ancillary/all/"
+  },
+  "outcome": {
+    "return_period": {
+      "folder": "/home/andrea/Desktop/Working_dir/IGAD_IBF/outcome/hazard/%Y/%m/%d/%H/",
+      "file_name": "return_period_%Y%m%d%H%M.tif"
+    },
+    "flood_map": {
+      "folder": "/home/andrea/Desktop/Working_dir/IGAD_IBF/outcome/impact/%Y/%m/%d/%H/",
+      "file_name": "flood_map_%Y%m%d%H%M.tif"
+    },
+    "impact_shapefile": {
+      "folder": "/home/andrea/Desktop/Working_dir/IGAD_IBF/outcome/impact/%Y/%m/%d/%H/",
+      "file_name": "impact_shapefile_{element}_%Y%m%d%H%M.shp"
+    }
+  },
+  "log": {
+    "folder": "/home/andrea/Desktop/Working_dir/IGAD_IBF/log/hazard/",
+    "file_name": "hazard_assessment.txt"
+  }
+}
