@@ -1,12 +1,13 @@
 {
   "flags": {
     "clear_ancillary": false,
-    "debug": false
+    "debug": false,
+    "skip_missing_models": true
   },
   "settings":{
     "domain": "IGAD_D2",
     "forecast_length_h": 120,
-    "tresholds": {
+    "thresholds": {
       "area_km": 100,
       "discharge_min": 1,
       "backup_T": 5
@@ -52,6 +53,68 @@
         "population": {
           "files" : ["/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL/pop2020/ALL/num/mul/{mul}.csv"]
         },
+        "displaced": {
+          "files":
+            {
+              "res": [
+                "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL/residential-C1/Residential_low_income/valfis/mul/{mul}.csv",
+                "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL/residential-M1/Residential_low_income/valfis/mul/{mul}.csv",
+                "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL/residential-M2/Residential_low_income/valfis/mul/{mul}.csv",
+                "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL/residential-W1/Residential_low_income/valfis/mul/{mul}.csv",
+                "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL/residential-T1/Residential_low_income/valfis/mul/{mul}.csv",
+                "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL/residential-W2/Residential_low_income/valfis/mul/{mul}.csv",
+                "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL/residential-C2/Residential_low_income/valfis/mul/{mul}.csv",
+                "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL/residential-C4/Residential_low_income/valfis/mul/{mul}.csv",
+                "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL/residential-C5/Residential_low_income/valfis/mul/{mul}.csv",
+                "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL/residential-C1/Residential_Medium_High_income/valfis/mul/{mul}.csv",
+                "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL/residential-M1/Residential_Medium_High_income/valfis/mul/{mul}.csv",
+                "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL/residential-M2/Residential_Medium_High_income/valfis/mul/{mul}.csv",
+                "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL/residential-W1/Residential_Medium_High_income/valfis/mul/{mul}.csv",
+                "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL/residential-T1/Residential_Medium_High_income/valfis/mul/{mul}.csv",
+                "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL/residential-W2/Residential_Medium_High_income/valfis/mul/{mul}.csv",
+                "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL/residential-C2/Residential_Medium_High_income/valfis/mul/{mul}.csv",
+                "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL/residential-C4/Residential_Medium_High_income/valfis/mul/{mul}.csv",
+                "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL/residential-C5/Residential_Medium_High_income/valfis/mul/{mul}.csv"
+              ],
+              "serv": [
+                "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL/employees-C1/Services/valfis/mul/{mul}.csv",
+                "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL/employees-M1/Services/valfis/mul/{mul}.csv",
+                "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL/employees-M2/Services/valfis/mul/{mul}.csv",
+                "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL/employees-W1/Services/valfis/mul/{mul}.csv",
+                "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL/employees-T1/Services/valfis/mul/{mul}.csv",
+                "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL/employees-W2/Services/valfis/mul/{mul}.csv",
+                "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL/employees-C3/Services/valfis/mul/{mul}.csv",
+                "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL/employees-C4/Services/valfis/mul/{mul}.csv",
+                "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL/employees-C5/Services/valfis/mul/{mul}.csv",
+                "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL/employees-C1/Governmental/valfis/mul/{mul}.csv",
+                "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL/employees-M1/Governmental/valfis/mul/{mul}.csv",
+                "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL/employees-M2/Governmental/valfis/mul/{mul}.csv",
+                "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL/employees-W1/Governmental/valfis/mul/{mul}.csv",
+                "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL/employees-T1/Governmental/valfis/mul/{mul}.csv",
+                "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL/employees-W2/Governmental/valfis/mul/{mul}.csv",
+                "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL/employees-C3/Governmental/valfis/mul/{mul}.csv",
+                "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL/employees-C4/Governmental/valfis/mul/{mul}.csv",
+                "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL/employees-C5/Governmental/valfis/mul/{mul}.csv"
+              ],
+              "ind": [
+                "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL/employees-C1/Industrial/valfis/mul/{mul}.csv",
+                "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL/employees-M1/Industrial/valfis/mul/{mul}.csv",
+                "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL/employees-M2/Industrial/valfis/mul/{mul}.csv",
+                "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL/employees-W1/Industrial/valfis/mul/{mul}.csv",
+                "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL/employees-T1/Industrial/valfis/mul/{mul}.csv",
+                "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL/employees-W2/Industrial/valfis/mul/{mul}.csv",
+                "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL/employees-C3/Industrial/valfis/mul/{mul}.csv",
+                "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL/employees-C4/Industrial/valfis/mul/{mul}.csv",
+                "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL/employees-C5/Industrial/valfis/mul/{mul}.csv"
+              ],
+              "crop": [
+                "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL/employees-crop/ALL/num/mul/{mul}.csv"
+              ],
+              "graze": [
+                "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL/employees-graze/ALL/num/mul/{mul}.csv"
+              ]
+            }
+        },
         "built": {
           "files":
             {
@@ -60,37 +123,95 @@
                 "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL//built-up-M1/Governmental/valfis/mul/{mul}.csv",
                 "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL//built-up-M2/Governmental/valfis/mul/{mul}.csv",
                 "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL//built-up-W1/Governmental/valfis/mul/{mul}.csv",
-                "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL//built-up-T1/Governmental/valfis/mul/{mul}.csv"
+                "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL//built-up-T1/Governmental/valfis/mul/{mul}.csv",
+                "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL//built-up-W2/Governmental/valfis/mul/{mul}.csv",
+                "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL//built-up-C2/Governmental/valfis/mul/{mul}.csv",
+                "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL//built-up-C4/Governmental/valfis/mul/{mul}.csv",
+                "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL//built-up-C5/Governmental/valfis/mul/{mul}.csv"
               ],
               "resLow": [
                 "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL//built-up-C1/Residential_low_income/valfis/mul/{mul}.csv",
                 "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL//built-up-M1/Residential_low_income/valfis/mul/{mul}.csv",
                 "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL//built-up-M2/Residential_low_income/valfis/mul/{mul}.csv",
                 "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL//built-up-W1/Residential_low_income/valfis/mul/{mul}.csv",
-                "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL//built-up-T1/Residential_low_income/valfis/mul/{mul}.csv"
+                "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL//built-up-T1/Residential_low_income/valfis/mul/{mul}.csv",
+                "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL//built-up-W2/Residential_low_income/valfis/mul/{mul}.csv",
+                "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL//built-up-C2/Residential_low_income/valfis/mul/{mul}.csv",
+                "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL//built-up-C4/Residential_low_income/valfis/mul/{mul}.csv",
+                "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL//built-up-C5/Residential_low_income/valfis/mul/{mul}.csv"
               ],
               "resMH": [
                 "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL//built-up-C1/Residential_Medium_High_income/valfis/mul/{mul}.csv",
                 "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL//built-up-M1/Residential_Medium_High_income/valfis/mul/{mul}.csv",
                 "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL//built-up-M2/Residential_Medium_High_income/valfis/mul/{mul}.csv",
                 "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL//built-up-W1/Residential_Medium_High_income/valfis/mul/{mul}.csv",
-                "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL//built-up-T1/Residential_Medium_High_income/valfis/mul/{mul}.csv"
+                "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL//built-up-T1/Residential_Medium_High_income/valfis/mul/{mul}.csv",
+                "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL//built-up-W2/Residential_Medium_High_income/valfis/mul/{mul}.csv",
+                "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL//built-up-C2/Residential_Medium_High_income/valfis/mul/{mul}.csv",
+                "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL//built-up-C4/Residential_Medium_High_income/valfis/mul/{mul}.csv",
+                "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL//built-up-C5/Residential_Medium_High_income/valfis/mul/{mul}.csv"
               ],
               "serv": [
                 "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL//built-up-C1/Services/valfis/mul/{mul}.csv",
                 "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL//built-up-M1/Services/valfis/mul/{mul}.csv",
                 "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL//built-up-M2/Services/valfis/mul/{mul}.csv",
                 "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL//built-up-W1/Services/valfis/mul/{mul}.csv",
-                "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL//built-up-T1/Services/valfis/mul/{mul}.csv"
+                "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL//built-up-T1/Services/valfis/mul/{mul}.csv",
+                "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL//built-up-W2/Services/valfis/mul/{mul}.csv",
+                "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL//built-up-C2/Services/valfis/mul/{mul}.csv",
+                "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL//built-up-C4/Services/valfis/mul/{mul}.csv",
+                "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL//built-up-C5/Services/valfis/mul/{mul}.csv"
               ],
               "ind": [
                 "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL//built-up-C1/Industrial/valfis/mul/{mul}.csv",
                 "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL//built-up-M1/Industrial/valfis/mul/{mul}.csv",
                 "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL//built-up-M2/Industrial/valfis/mul/{mul}.csv",
                 "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL//built-up-W1/Industrial/valfis/mul/{mul}.csv",
-                "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL//built-up-T1/Industrial/valfis/mul/{mul}.csv"
+                "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL//built-up-T1/Industrial/valfis/mul/{mul}.csv",
+                "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL//built-up-W2/Industrial/valfis/mul/{mul}.csv",
+                "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL//built-up-C2/Industrial/valfis/mul/{mul}.csv",
+                "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL//built-up-C4/Industrial/valfis/mul/{mul}.csv",
+                "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL//built-up-C5/Industrial/valfis/mul/{mul}.csv"
               ]
             }
+        },
+        "services": {
+          "files": {
+            "health": [
+              "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL/services-C1/health/valfis/mul/{mul}.csv",
+              "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL/services-M1/health/valfis/mul/{mul}.csv",
+              "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL/services-M2/health/valfis/mul/{mul}.csv",
+              "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL/services-T1/health/valfis/mul/{mul}.csv",
+              "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL/services-W1/health/valfis/mul/{mul}.csv",
+              "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL/services-W2/health/valfis/mul/{mul}.csv",
+              "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL/services-C2/health/valfis/mul/{mul}.csv",
+              "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL/services-C4/health/valfis/mul/{mul}.csv",
+              "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL/services-C5/health/valfis/mul/{mul}.csv"
+            ],
+            "edu": [
+              "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL/services-C1/edu/valfis/mul/{mul}.csv",
+              "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL/services-M1/edu/valfis/mul/{mul}.csv",
+              "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL/services-M2/edu/valfis/mul/{mul}.csv",
+              "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL/services-T1/edu/valfis/mul/{mul}.csv",
+              "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL/services-W1/edu/valfis/mul/{mul}.csv",
+              "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL/services-W2/edu/valfis/mul/{mul}.csv",
+              "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL/services-C2/edu/valfis/mul/{mul}.csv",
+              "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL/services-C4/edu/valfis/mul/{mul}.csv",
+              "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL/services-C5/edu/valfis/mul/{mul}.csv"
+            ]
+          }
+        },
+        "cropland": {
+          "files": ["/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL/crop/ALL/num/mul/{mul}.csv"],
+          "multiplier" : 1
+        },
+        "livestock": {
+          "files": ["/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL/Livestock/ALL/num/mul/{mul}.csv"],
+          "multiplier" : 1
+        },
+        "grazing": {
+          "files": ["/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL/grazing/ALL/num/mul/{mul}.csv"],
+          "multiplier" : 1
         }
       }
     },
@@ -105,7 +226,22 @@
     }
   },
   "input": {
-    "hmc_output": "/home/andrea/Desktop/Working_dir/IGAD_IBF/test_data/%Y/%m/%d/%H/outcome/deterministic/"
+    "nwp_ecmwfAIFS-det": {
+      "folder": "/home/andrea/Desktop/Working_dir/IGAD_IBF/test_data/%Y/%m/%d/nwp_ecmwfAIFS-det/",
+      "weight": 0.25
+    },
+    "nwp_ecmwfIFS-det": {
+      "folder": "/home/andrea/Desktop/Working_dir/IGAD_IBF/test_data/%Y/%m/%d/nwp_ecmwfIFS-det/",
+      "weight": 0.25
+    },
+    "nwp_gfs-det": {
+      "folder": "/home/andrea/Desktop/Working_dir/IGAD_IBF/test_data/%Y/%m/%d/nwp_gfs-det/",
+      "weight": 0.25
+    },
+    "nwp_icon-det": {
+      "folder": "/home/andrea/Desktop/Working_dir/IGAD_IBF/test_data/%Y/%m/%d/nwp_icon-det/",
+      "weight": 0.25
+    }
   },
   "ancillary":  {
     "folder" :  "/home/andrea/Desktop/Working_dir/IGAD_IBF/ancillary/all/"

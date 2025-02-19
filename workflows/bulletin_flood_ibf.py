@@ -53,14 +53,15 @@ def main(settings_file: str, alg_time: str, domain: str = None) -> None:
     # Create HazardAssessment instance
     rp_file = CalculateFloodReturnPeriod(
          forecast_length_h=settings['settings']['forecast_length_h'],
-         thresholds=settings['settings']['tresholds'],
+         thresholds=settings['settings']['thresholds'],
          distribution=settings['settings']['distribution'],
          static_data=settings['static_data']['hydro'],
-         input_folder=settings['input']['hmc_output'],
+         input_data=settings['input'],
          ancillary_folder=settings['ancillary']['folder'],
          outcome_folder=settings['outcome']['return_period']['folder'],
          outcome_filename=settings['outcome']['return_period']['file_name'],
-         clear_ancillary_flag=settings['flags']['clear_ancillary']
+         clear_ancillary_flag=settings['flags']['clear_ancillary'],
+         skip_missing_models=settings['flags']['skip_missing_models']
      ).run(date_now, forecast_end)
 
     # Run flood hazard mapping
@@ -107,12 +108,13 @@ def main(settings_file: str, alg_time: str, domain: str = None) -> None:
     logging.info("Save output shapefiles")
     # Save the final shapefiles with the calculated impacts
     for exposed_element in exposed_elements:
+        domain_shape_toedit = domain_shape.copy()
         logging.info(f"Saving shapefiles for {exposed_element}")
         IOHandler.save_impact_shapefiles(
             exposed_element = exposed_element,
             folder_name= format_path_with_time(update_file_paths(settings['outcome']['impact_shapefile']['folder'], {"element": exposed_element}), date_now),
             file_name= format_path_with_time(update_file_paths(settings['outcome']['impact_shapefile']['file_name'], {"element": exposed_element}), date_now),
-            domain_shape= domain_shape,
+            domain_shape= domain_shape_toedit,
             impacts_table=impacts_table,
             hazard = "flood"
         )

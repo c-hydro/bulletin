@@ -5,8 +5,6 @@ pytz
 rioxarray
 netCDF4
 logging
-shutil
-gzip
 argparse
 geopandas
 dask

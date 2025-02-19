@@ -160,20 +160,20 @@ def format_path_with_time(path_template: str, date_time: dt.datetime) -> str:
     return date_time.strftime(path_template)
 
 
-def replace_keys(value: str, replacements: dict[str, str]) -> str:
+def replace_keys(value, replacements: dict[str, str]):
     """
     Replace keys in a string with their corresponding values.
 
     :param value: String with keys to replace.
     :param replacements: Dictionary of replacements.
-    :return: String with replaced keys.
+    :return: String with replaced keys or the original value if it's not a string.
     """
-    for key, replacement in replacements.items():
-        value = value.replace(f"{{{key}}}", replacement)
+    if isinstance(value, str):
+        for key, replacement in replacements.items():
+            value = value.replace(f"{{{key}}}", replacement)
     return value
 
-
-def update_file_paths(file_paths: 'dict | list | str', replacements: dict[str, str]) -> 'dict | list | str':
+def update_file_paths(file_paths, replacements: dict[str, str]):
     """
     Update file paths with replacements.
 
