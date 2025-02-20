@@ -61,7 +61,7 @@ class IOHandler:
                              compress="DEFLATE", nodata=nodata)
 
     @staticmethod
-    def save_impact_shapefiles(exposed_element: str, folder_name: str, file_name: str, domain_shape: gpd.GeoDataFrame, impacts_table: pd.DataFrame, hazard: str) -> None:
+    def save_impact_shapefiles(exposed_element: str, folder_name: str, file_name: str, domain_shape: gpd.GeoDataFrame, impacts_table: pd.DataFrame, hazard: str, rounding: bool = False) -> None:
         """
         Save impact data to shapefiles.
 
@@ -71,7 +71,11 @@ class IOHandler:
         :param domain_shape: GeoDataFrame of the domain shape.
         :param impacts_table: DataFrame of impacts.
         :param hazard: Hazard name.
+        :param rounding: The number of decimal places to round to.
         """
+        if rounding:
+            impacts_table = impacts_table.round(0).astype(int)
+
         IOHandler.create_directories([folder_name])
         output_file = os.path.join(folder_name, file_name)
 

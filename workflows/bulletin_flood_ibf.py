@@ -116,7 +116,8 @@ def main(settings_file: str, alg_time: str, domain: str = None) -> None:
             file_name= format_path_with_time(update_file_paths(settings['outcome']['impact_shapefile']['file_name'], {"element": exposed_element}), date_now),
             domain_shape= domain_shape_toedit,
             impacts_table=impacts_table,
-            hazard = "flood"
+            hazard = "flood",
+            rounding = settings['static_data']['impacts']['MUL'].get(exposed_element, {}).get('rounding', False)
         )
 
     logging.info("Classify impact levels")

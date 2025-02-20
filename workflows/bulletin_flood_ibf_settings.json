@@ -51,7 +51,8 @@
       },
       "MUL": {
         "population": {
-          "files" : ["/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL/pop2020/ALL/num/mul/{mul}.csv"]
+          "files" : ["/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL/pop2020/ALL/num/mul/{mul}.csv"],
+          "rounding": true
         },
         "displaced": {
           "files":
@@ -113,7 +114,8 @@
               "graze": [
                 "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL/employees-graze/ALL/num/mul/{mul}.csv"
               ]
-            }
+            },
+          "rounding": true
         },
         "built": {
           "files":
@@ -173,7 +175,8 @@
                 "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL//built-up-C4/Industrial/valfis/mul/{mul}.csv",
                 "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL//built-up-C5/Industrial/valfis/mul/{mul}.csv"
               ]
-            }
+            },
+          "rounding": false
         },
         "services": {
           "files": {
@@ -199,19 +202,23 @@
               "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL/services-C4/edu/valfis/mul/{mul}.csv",
               "/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL/services-C5/edu/valfis/mul/{mul}.csv"
             ]
-          }
+          },
+          "rounding": true
         },
         "cropland": {
           "files": ["/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL/crop/ALL/num/mul/{mul}.csv"],
-          "multiplier" : 1
+          "multiplier" : 1,
+          "rounding": true
         },
         "livestock": {
           "files": ["/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL/Livestock/ALL/num/mul/{mul}.csv"],
-          "multiplier" : 1
+          "multiplier" : 1,
+          "rounding": true
         },
         "grazing": {
           "files": ["/home/andrea/Desktop/Working_dir/IGAD_IBF/IMPACTS/{subdomain}/results/HISTORICAL/grazing/ALL/num/mul/{mul}.csv"],
-          "multiplier" : 1
+          "multiplier" : 1,
+          "rounding": true
         }
       }
     },
