@@ -5,9 +5,10 @@ import pandas as pd
 import datetime as dt
 from common.io_handler import IOHandler, format_path_with_time
 from common.evd import get_distribution
+from common.hydro_tools import HydroTools
 
 class CalculateFloodReturnPeriod:
-    def __init__(self, forecast_length_h: int, thresholds: dict, distribution: str, static_data: dict, input_data: dict, ancillary_folder: str, outcome_folder: str, outcome_filename: str, clear_ancillary_flag: bool, skip_missing_models: bool):
+    def __init__(self, forecast_length_h: int, thresholds: dict, distribution: str, static_data: dict, input_data: dict, ancillary_folder: str, outcome_folder: str, outcome_filename: str, clear_ancillary_flag: bool, skip_missing_models: bool, save_return_period_shapefile: bool, shapefile_folder: str or None = None, shapefile_filename: str or None = None):
         """
         Initialize the CalculateFloodReturnPeriod.
 
@@ -21,6 +22,9 @@ class CalculateFloodReturnPeriod:
         :param outcome_filename: Name of the outcome file.
         :param clear_ancillary_flag: Flag to clear the ancillary folder.
         :param skip_missing_models: Flag to skip missing models.
+        :param save_return_period_shapefile: Flag to save the return period shapefile.
+        :param shapefile_folder: Path to the shapefile folder.
+        :param shapefile_filename: Name of the shapefile file.
         """
         self.forecast_length_h = forecast_length_h
         self.thresholds = thresholds
@@ -32,6 +36,9 @@ class CalculateFloodReturnPeriod:
         self.outcome_filename = outcome_filename
         self.clear_ancillary_flag = clear_ancillary_flag
         self.skip_missing_models = skip_missing_models
+        self.save_return_period_shapefile = save_return_period_shapefile
+        self.shapefile_folder = shapefile_folder
+        self.shapefile_filename = shapefile_filename
 
     def create_directories(self, date_now: dt.datetime) -> None:
         """
@@ -130,16 +137,10 @@ class CalculateFloodReturnPeriod:
         return_period_path = format_path_with_time(
             os.path.join(self.outcome_folder, self.outcome_filename), date_now)
         IOHandler.write_tif(dis_max, lon, lat, max_discharge_path)
-        IOHandler.write_tif(rp, lon, lat, return_period_path)
+        IOHandler.write_tif(rp, lon, lat, return_period_path, nodata=0, dtype='int16')
+
 
     def run(self, date_now: dt.datetime, forecast_end: dt.datetime) -> str:
-        """
-        Run the flood return period calculation.
-
-        :param date_now: Current date.
-        :param forecast_end: Forecast end date.
-        :return: Path to the return period file.
-        """
         self.create_directories(date_now)
 
         dis_max_list = []
@@ -149,14 +150,16 @@ class CalculateFloodReturnPeriod:
         for model, data in self.input_data.items():
             try:
                 logging.info(f"Processing model {model}")
-                results, mask, lon, lat = IOHandler.extract_hmc_results(format_path_with_time(data['folder'], date_now), date_now, forecast_end)
+                results, mask, lon, lat = IOHandler.extract_hmc_results(format_path_with_time(data['folder'], date_now),
+                                                                        date_now, forecast_end)
                 dis_max = self.calculate_max_forecast(results)
                 dis_max_list.append(dis_max)
                 weights.append(data['weight'])
             except FileNotFoundError:
                 missing_models.append(model)
                 if not self.skip_missing_models:
-                    raise FileNotFoundError(f"Model results for {model} not found and skip_missing_models is set to False.")
+                    raise FileNotFoundError(
+                        f"Model results for {model} not found and skip_missing_models is set to False.")
 
         if missing_models:
             logging.warning(f"Missing models: {', '.join(missing_models)}")
@@ -173,7 +176,20 @@ class CalculateFloodReturnPeriod:
             weighted_dis_max = dis_max_list[0]
 
         theta1_map, theta2_map, theta3_map, average_max_map, area_map, areacell_map = self.read_spatial_maps()
-        rp = self.calculate_return_period(weighted_dis_max, theta1_map, theta2_map, theta3_map, average_max_map, area_map, areacell_map)
+        rp = self.calculate_return_period(weighted_dis_max, theta1_map, theta2_map, theta3_map, average_max_map,
+                                          area_map, areacell_map)
+
+        # Always save the raster
         self.save_results(weighted_dis_max, rp, lon, lat, date_now)
+
+        # Conditionally save the shapefile
+        if self.save_return_period_shapefile:
+            hydro_tools = HydroTools(self.static_data['area'], self.static_data['areacell'], self.static_data['direction'])
+            maps_to_extract = {"rp": rp}
+            gdf = hydro_tools.extract_river_geodataframe(area_limit=self.thresholds['area_km'], maps_to_extract=maps_to_extract, include_log_area=True)
+            output_shapefile_path = format_path_with_time(os.path.join(self.shapefile_folder, self.shapefile_filename), date_now)
+            gdf.to_file(output_shapefile_path, driver="ESRI Shapefile")
+            logging.info("Return period shapefile has been created successfully.")
+
         IOHandler.clear_ancillary_folder(self.ancillary_folder, self.clear_ancillary_flag)
         return format_path_with_time(os.path.join(self.outcome_folder, self.outcome_filename), date_now)

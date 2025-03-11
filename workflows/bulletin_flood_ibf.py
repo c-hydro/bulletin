@@ -61,7 +61,10 @@ def main(settings_file: str, alg_time: str, domain: str = None) -> None:
          outcome_folder=settings['outcome']['return_period']['folder'],
          outcome_filename=settings['outcome']['return_period']['file_name'],
          clear_ancillary_flag=settings['flags']['clear_ancillary'],
-         skip_missing_models=settings['flags']['skip_missing_models']
+         skip_missing_models=settings['flags']['skip_missing_models'],
+         save_return_period_shapefile=settings['flags']['save_return_period_shapefile'],
+         shapefile_folder=settings['outcome']['return_period_shapefile']['folder'],
+         shapefile_filename=settings['outcome']['return_period_shapefile']['file_name']
      ).run(date_now, forecast_end)
 
     # Run flood hazard mapping

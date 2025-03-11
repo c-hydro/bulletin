@@ -1,4 +1,5 @@
 import logging
+import tempfile
 import os
 import sys
 from copy import deepcopy
@@ -20,12 +21,12 @@ def reset_logging_stream(logger_name: str) -> None:
         logger.propagate = True
 
 def set_logging_stream(
-    logger_folder: str,
-    logger_file: str,
+    logger_folder: str = None,
+    logger_file: str = None,
     logger_format: str = "%(asctime)s %(levelname)-8s %(message)-80s %(filename)s:[%(lineno)-6s - %(funcName)-20s()]",
     logger_level: int = logging.INFO,
     logger_name: str = "logger"
-    ) -> None:
+    ) -> str:
     """
     Set the logging stream.
 
@@ -34,6 +35,7 @@ def set_logging_stream(
     :param logger_format: Format of the log messages.
     :param logger_level: Logging level.
     :param logger_name: Name of the logger.
+    :return: Path to the log file.
     """
     reset_logging_stream(logger_name=logger_name)
 
@@ -42,11 +44,27 @@ def set_logging_stream(
     if logger_file is None:
         logger_file = deepcopy(logger_file)
 
-    if logger_folder is not None:
-        logger_path = os.path.join(logger_folder, logger_file)
-    else:
-        logger_path = deepcopy(logger_file)
+    if logger_folder is None or logger_file is None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            logger_folder = temp_dir
+            logger_file = "temp_log.log"
+            logger_path = os.path.join(logger_folder, logger_file)
+            setup_logging(logger_path, logger_format, logger_level, logger_name)
+            return logger_path
 
+    logger_path = os.path.join(logger_folder, logger_file)
+    setup_logging(logger_path, logger_format, logger_level, logger_name)
+    return logger_path
+
+def setup_logging(logger_path: str, logger_format: str, logger_level: int, logger_name: str) -> None:
+    """
+    Helper function to set up logging.
+
+    :param logger_path: Path to the log file.
+    :param logger_format: Format of the log messages.
+    :param logger_level: Logging level.
+    :param logger_name: Name of the logger.
+    """
     if os.path.exists(logger_path):
         os.remove(logger_path)
 
