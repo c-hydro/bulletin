@@ -2,7 +2,8 @@
   "flags": {
     "clear_ancillary": false,
     "debug": false,
-    "skip_missing_models": true
+    "skip_missing_models": true,
+    "save_return_period_shapefile": true
   },
   "settings":{
     "domain": "IGAD_D2",
@@ -18,6 +19,7 @@
     "hydro": {
     "areacell": "/home/andrea/Desktop/Working_dir/IGAD_IBF/STATIC/{domain}.areacell.txt",
     "area": "/home/andrea/Desktop/Working_dir/IGAD_IBF/STATIC/{domain}.area.txt",
+    "direction": "/home/andrea/backup/Desktop/Working_dir/New Folder 3/PPT_Workshop/Continuum/data_static/{domain}/gridded/{domain}.pnt.txt",
     "average_max": "/home/andrea/Desktop/Working_dir/IGAD_IBF/EVA/output/{domain}_avg-max.tif",
     "parameters": {
       "theta1": "/home/andrea/Desktop/Working_dir/IGAD_IBF/EVA/output/{domain}_theta1.tif",
@@ -257,6 +259,10 @@
     "return_period": {
       "folder": "/home/andrea/Desktop/Working_dir/IGAD_IBF/outcome/hazard/%Y/%m/%d/%H/",
       "file_name": "return_period_%Y%m%d%H%M.tif"
+    },
+    "return_period_shapefile": {
+      "folder": "/home/andrea/Desktop/Working_dir/IGAD_IBF/outcome/hazard/%Y/%m/%d/%H/",
+      "file_name": "return_period_%Y%m%d%H%M.shp"
     },
     "flood_map": {
       "folder": "/home/andrea/Desktop/Working_dir/IGAD_IBF/outcome/impact/%Y/%m/%d/%H/",

@@ -174,7 +174,10 @@ def replace_keys(value, replacements: dict[str, str]):
     """
     if isinstance(value, str):
         for key, replacement in replacements.items():
-            value = value.replace(f"{{{key}}}", replacement)
+            try:
+                value = value.replace(f"{{{key}}}", replacement)
+            except:
+                pass
     return value
 
 def update_file_paths(file_paths, replacements: dict[str, str]):
