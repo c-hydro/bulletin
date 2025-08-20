@@ -29,7 +29,7 @@ class ImpactClassifier:
         gdf[short_hazard + "_perc"] = gdf[short_hazard + "_perc"].fillna(0)
         gdf[short_hazard + "_clas"] = -9999.0
 
-        risk = 1
+        risk = 0
         for index, row in gdf.iterrows():
             impact_rate = row[short_hazard + "_perc"]
             aff_people = row[short_hazard + "_tot"]

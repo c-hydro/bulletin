@@ -3,7 +3,9 @@
     "clear_ancillary": false,
     "debug": false,
     "skip_missing_models": true,
-    "save_return_period_shapefile": true
+    "skip_empty_floodmaps": true,
+    "save_return_period_shapefile": true,
+    "apply_flood_protection": false
   },
   "settings":{
     "domain": "IGAD_D2",

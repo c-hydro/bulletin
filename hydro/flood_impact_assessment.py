@@ -13,7 +13,7 @@ class ImpactAssessment:
         """
         self.admin_shape = admin_shape
 
-    def process_impact_files(self, rp: int, filtered_hydro_to_admin: pd.DataFrame, impacts_table: pd.DataFrame, impact_files: dict) -> None:
+    def process_impact_files(self, rp: int, filtered_hydro_to_admin: pd.DataFrame, impacts_table: pd.DataFrame, impact_files: dict, apply_defense: bool) -> None:
         """
         Process impact files for a given return period.
 
@@ -34,15 +34,15 @@ class ImpactAssessment:
                 if isinstance(impact_files_list, dict):
                     for sub_category in impact_files_list:
                         for file in impact_files_list[sub_category]:
-                            self.process_mul(file, rp, row, impacts_table, exposed_element, sub_category, impact_files)
+                            self.process_mul(file, rp, row, impacts_table, exposed_element, sub_category, impact_files, apply_defense=apply_defense)
                 elif isinstance(impact_files_list, list):
                     for file in impact_files_list:
-                        self.process_mul(file, rp, row, impacts_table, exposed_element, impact_files=impact_files)
+                        self.process_mul(file, rp, row, impacts_table, exposed_element, impact_files=impact_files, apply_defense=apply_defense)
                 else:
                     logging.error("ERROR! The type of impact_files['hydro'][exposed_element] should be either a list (even a singular one) or a dictionary!")
                     raise ValueError
 
-    def process_mul(self, file: str, rp: int, row: pd.Series, impacts_table: pd.DataFrame, exposed_element: str, sub_category: str = None, impact_files: dict = None) -> None:
+    def process_mul(self, file: str, rp: int, row: pd.Series, impacts_table: pd.DataFrame, exposed_element: str, sub_category: str = None, impact_files: dict = None, apply_defense : bool = False) -> None:
         """
         Process a single impact file.
 
@@ -53,6 +53,7 @@ class ImpactAssessment:
         :param exposed_element: Exposed element name.
         :param sub_category: Sub-category name.
         :param impact_files: Dictionary of impact files.
+        :param apply_defense: Flag to apply flood defenses defense.
         """
         mul = row["mul"]
         mul_file = file.format(mul=str(int(mul)))
@@ -67,7 +68,10 @@ class ImpactAssessment:
 
         impact_mul = impact_data.loc[rp, "abs"]
         admin = row.name
-        defense = row["defense"]
+        if apply_defense:
+            defense = row["defense"]
+        else:
+            defense = 0
 
         if defense > 0 and rp < defense:
             impact_mul = 0
@@ -85,13 +89,14 @@ class ImpactAssessment:
                 impacts_table["flood_tot_" + exposed_element + "_" + sub_category] = 0.0
             impacts_table.at[admin, "flood_tot_" + exposed_element + "_" + sub_category] += impact_mul * multiplier
 
-    def run(self, levels_sections: dict, hydro_to_admin: pd.DataFrame, impact_files: dict) -> pd.DataFrame:
+    def run(self, levels_sections: dict, hydro_to_admin: pd.DataFrame, impact_files: dict, apply_defense: bool = False) -> pd.DataFrame:
         """
         Run the impact assessment.
 
         :param levels_sections: Dictionary of levels and sections.
         :param hydro_to_admin: DataFrame mapping hydro to admin.
         :param impact_files: Dictionary of impact files.
+        :param apply_defense: Flag to apply flood protection.
         :return: DataFrame of impacts.
         """
         logging.info("Calculate impacts...")
@@ -105,7 +110,7 @@ class ImpactAssessment:
         for rp in levels_sections:
             logging.info("Merge return period " + str(rp))
             filtered_hydro_to_admin = hydro_to_admin[hydro_to_admin["hydro"].isin(levels_sections[rp])]
-            self.process_impact_files(rp, filtered_hydro_to_admin, impacts_table, impact_files)
+            self.process_impact_files(rp, filtered_hydro_to_admin, impacts_table, impact_files, apply_defense)
 
         return impacts_table
 

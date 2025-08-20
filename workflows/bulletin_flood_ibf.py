@@ -76,7 +76,8 @@ def main(settings_file: str, alg_time: str, domain: str = None) -> None:
          flood_maps_template=hazard_dict["flood_maps"],
          decode_map=hazard_dict["decode_map"],
          outcome_folder=settings['outcome']['flood_map']['folder'],
-         outcome_filename=settings['outcome']['flood_map']["file_name"]
+         outcome_filename=settings['outcome']['flood_map']["file_name"],
+         skip_empty_maps=settings['flags']['skip_empty_floodmaps']
     ).run(date_now, rp_file)
 
     logging.info("Perform impact assessment")
@@ -105,7 +106,7 @@ def main(settings_file: str, alg_time: str, domain: str = None) -> None:
 
         # Perform the impact assessment
         impact_assessment = ImpactAssessment(admin_shape=domain_shape)
-        subdomain_impacts_table = impact_assessment.run(levels_sections, hydro_to_admin, impact_files)
+        subdomain_impacts_table = impact_assessment.run(levels_sections, hydro_to_admin, impact_files, apply_defense = settings['flags']['apply_flood_protection'])
         impacts_table = impacts_table.add(subdomain_impacts_table, fill_value=0)
 
     logging.info("Save output shapefiles")

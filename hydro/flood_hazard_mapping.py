@@ -7,7 +7,7 @@ import xarray as xr
 from common.io_handler import IOHandler, format_path_with_time
 
 class FloodHazardMerge:
-    def __init__(self, section_map: str, section_map_field: str, return_periods: list[int], flood_maps_template: str, decode_map: str, outcome_folder: str, outcome_filename: str):
+    def __init__(self, section_map: str, section_map_field: str, return_periods: list[int], flood_maps_template: str, decode_map: str, outcome_folder: str, outcome_filename: str, skip_empty_maps: bool = False):
         """
         Initialize the FloodHazardMerge.
 
@@ -26,6 +26,7 @@ class FloodHazardMerge:
         self.decode_map = decode_map
         self.outcome_folder = outcome_folder
         self.outcome_filename = outcome_filename
+        self.skip_empty_maps = skip_empty_maps
 
     def create_flood_map(self, rp_raster: 'xr.DataArray') -> tuple[np.ndarray, np.ndarray, np.ndarray, dict]:
         """
@@ -132,5 +133,8 @@ class FloodHazardMerge:
         mosaic_flood_map, lat_mosaic, lon_mosaic, levels_sections = self.create_flood_map(rp_raster)
         flood_map = format_path_with_time(os.path.join(self.outcome_folder, self.outcome_filename), date_now)
         IOHandler.create_directories([os.path.dirname(flood_map)])
-        IOHandler.write_tif(mosaic_flood_map, lon_mosaic, lat_mosaic, flood_map, dtype="int16")
+        if self.skip_empty_maps and np.nanmax(mosaic_flood_map) == 0:
+            logging.info("Skipping writing empty flood map")
+        else:
+            IOHandler.write_tif(mosaic_flood_map, lon_mosaic, lat_mosaic, flood_map, dtype="int16")
         return flood_map, levels_sections

@@ -7,7 +7,7 @@ from common.io_handler import IOHandler
 import rasterio as rio
 
 class HydroTools:
-    def __init__(self, area: str, areacell: str, direction: str):
+    def __init__(self, static_directory:str, domain:str):
         """
         Initialize HydroTools with paths to area, areacell, and direction rasters.
 
@@ -15,9 +15,9 @@ class HydroTools:
         :param areacell: Path to the areacell raster file.
         :param direction: Path to the direction raster file.
         """
-        self.area = area
-        self.areacell = areacell
-        self.direction = direction
+        self.area = os.path.join(static_directory, domain + ".area.txt")
+        self.areacell = os.path.join(static_directory, domain + ".areacell.txt")
+        self.direction = os.path.join(static_directory, domain + ".pnt.txt")
 
     def calculate_area_km(self):
         """

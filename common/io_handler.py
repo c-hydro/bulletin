@@ -58,7 +58,7 @@ class IOHandler:
         out_ds.values = np.where(out_ds.values == nodata, nodata, out_ds.values.astype(dtype))
         out_ds = out_ds.rio.write_crs(crs, inplace=True).rio.write_nodata(nodata, inplace=True)
         out_ds.rio.to_raster(out_filename, driver="GTiff", crs=crs, height=len(lat), width=len(lon), dtype=out_ds.dtype,
-                             compress="DEFLATE", nodata=nodata)
+                         compress="DEFLATE", nodata=nodata)
 
     @staticmethod
     def save_impact_shapefiles(exposed_element: str, folder_name: str, file_name: str, domain_shape: gpd.GeoDataFrame, impacts_table: pd.DataFrame, hazard: str, rounding: bool = False) -> None:
