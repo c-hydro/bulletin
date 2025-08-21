@@ -1,13 +1,16 @@
 import numpy as np
 import os
+import pandas as pd
 import logging
 import geopandas as gpd
 import datetime as dt
 import xarray as xr
+from typing import Optional
+
 from common.io_handler import IOHandler, format_path_with_time
 
 class FloodHazardMerge:
-    def __init__(self, section_map: str, section_map_field: str, return_periods: list[int], flood_maps_template: str, decode_map: str, outcome_folder: str, outcome_filename: str, skip_empty_maps: bool = False):
+    def __init__(self, section_map: str or None, section_map_field: str or None, return_periods: list[int], flood_maps_template: str, decode_map: str, outcome_folder: str, outcome_filename: str, skip_empty_maps: bool = False):
         """
         Initialize the FloodHazardMerge.
 
@@ -20,7 +23,6 @@ class FloodHazardMerge:
         :param outcome_filename: Name of the outcome file.
         """
         self.section_map = section_map
-        self.section_map_field = section_map_field
         self.return_periods = return_periods
         self.flood_maps_template = flood_maps_template
         self.decode_map = decode_map
@@ -28,18 +30,31 @@ class FloodHazardMerge:
         self.outcome_filename = outcome_filename
         self.skip_empty_maps = skip_empty_maps
 
-    def create_flood_map(self, rp_raster: 'xr.DataArray') -> tuple[np.ndarray, np.ndarray, np.ndarray, dict]:
+        if section_map_field is None:
+            self.section_map_field = 'section'
+        else:
+            self.section_map_field = section_map_field
+
+    def create_flood_map(self,
+                         rp_raster: Optional['xr.DataArray'] = None,
+                         section_T_df: Optional['pd.DataFrame'] = None) -> tuple[np.ndarray, np.ndarray, np.ndarray, dict]:
         """
         Create a flood map.
 
         :param rp_raster: Raster of return periods.
+        :param section_T_df: Optional DataFrame with section–T mapping.
         :return: Tuple of mosaic flood map, latitude mosaic, longitude mosaic, and levels sections.
         """
-        logging.info("Tailoring flood map")
-        section_gdf = gpd.read_file(self.section_map)
-
-        logging.info("Assign the return period to the sections (it might take a while)")
-        section_gdf = self.assign_return_periods(section_gdf, rp_raster)
+        if section_T_df is None:
+            # Original behaviour: read section map and assign T from raster
+            section_gdf = gpd.read_file(self.section_map)
+            logging.info("Assign the return period to the sections (it might take a while)")
+            section_gdf = self.assign_return_periods(section_gdf, rp_raster)
+        else:
+            # New behaviour: use provided table section–T
+            section_gdf = section_T_df.copy()
+            del section_T_df
+            logging.info("Using provided section–T table, skipping raster assignment")
 
         levels_sections = {}
         available_rps = np.array(self.return_periods)
@@ -121,16 +136,20 @@ class FloodHazardMerge:
         lon_mosaic = flood_map_level.x.values
         return mosaic_flood_map, lat_mosaic, lon_mosaic
 
-    def run(self, date_now: dt.datetime, rp_file: str) -> tuple[str, dict]:
+    def run(self, date_now: dt.datetime, rp_file: str, section_T_df: Optional['pd.DataFrame'] = None) -> tuple[str, dict]:
         """
         Run the flood hazard mapping.
 
         :param date_now: Current date.
-        :param rp_file: Path to the return period file.
+        :param rp_file: Path to the return period file (may be empty if section_DF is already provided).
+        :param section_T_df: Optional DataFrame with section–T mapping.
         :return: Tuple of flood map path and levels sections.
         """
-        rp_raster = IOHandler.read_raster(rp_file, memory_map=True)
-        mosaic_flood_map, lat_mosaic, lon_mosaic, levels_sections = self.create_flood_map(rp_raster)
+        if section_T_df is None:
+            rp_raster = IOHandler.read_raster(rp_file, memory_map=True)
+            mosaic_flood_map, lat_mosaic, lon_mosaic, levels_sections = self.create_flood_map(rp_raster=rp_raster)
+        else:
+            mosaic_flood_map, lat_mosaic, lon_mosaic, levels_sections = self.create_flood_map(section_T_df=section_T_df)
         flood_map = format_path_with_time(os.path.join(self.outcome_folder, self.outcome_filename), date_now)
         IOHandler.create_directories([os.path.dirname(flood_map)])
         if self.skip_empty_maps and np.nanmax(mosaic_flood_map) == 0:

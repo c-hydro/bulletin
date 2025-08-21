@@ -4,7 +4,7 @@ numpy
 pytz
 rioxarray
 netCDF4
-logging
-argparse
 geopandas
 dask
+scipy
+git+https://github.com/Ouranosinc/lmoments3.git@v1.0.6

@@ -81,6 +81,10 @@ class ImpactAssessment:
                 impact_mul -= impact_data.loc[rp_defense, "abs"]
 
         multiplier = impact_files[exposed_element].get("multiplier", 1)
+        exluded_multipier = impact_files[exposed_element].get("excluded_multiplier", [])
+        if sub_category is not None:
+            if sub_category in exluded_multipier:
+                multiplier = 1
         # Update the impacts table with the impact data
         impacts_table.at[admin, "flood_tot_" + exposed_element] += impact_mul * multiplier
         if sub_category:
@@ -130,13 +134,33 @@ def initialize_subdomain_inputs(domain: str, subdomain: str, domain_shape: gpd.G
     hydro_to_admin_file = update_file_paths(hydro_to_admin_table['filename'], replacements)
 
     # Load and filter hydro_to_admin table
-    hydro_to_admin = pd.read_csv(hydro_to_admin_file)
-    hydro_to_admin = hydro_to_admin[[hydro_to_admin_table['admin_column'],
-                                     hydro_to_admin_table['hydro_column'],
-                                     hydro_to_admin_table['defense_column'],
-                                     hydro_to_admin_table['mul_column']]]
-    hydro_to_admin.columns = ['admin', 'hydro', 'defense', 'mul']
-    hydro_to_admin = hydro_to_admin[hydro_to_admin['admin'].isin(domain_shape.index)]
-    hydro_to_admin.set_index('admin', inplace=True)
+    src = pd.read_csv(hydro_to_admin_file)
 
-    return hydro_to_admin, impact_files
+    admin_col = hydro_to_admin_table['admin_column']
+    hydro_col = hydro_to_admin_table.get('hydro_column')
+    defense_col = hydro_to_admin_table.get('defense_column')
+    mul_col = hydro_to_admin_table['mul_column']
+
+    # Build the working frame
+    df = pd.DataFrame(index=src.index)
+    df['admin'] = src[admin_col]
+
+    # hydro: use provided column if valid, else default -9999
+    if hydro_col is not None and hydro_col in src.columns:
+        df['hydro'] = src[hydro_col]
+    else:
+        raise ValueError(f"Hydro column '{hydro_col}' not found in the source data. Association mul-hydro domain is needed!")
+
+    # defense: use provided column if valid, else default 0
+    if defense_col is not None and defense_col in src.columns:
+        df['defense'] = src[defense_col]
+    else:
+        df['defense'] = 0
+
+    # mul: required
+    df['mul'] = src[mul_col]
+
+    # Keep only admins in domain_shape index and index by admin
+    df = df[df['admin'].isin(domain_shape.index)].set_index('admin')
+
+    return df, impact_files

@@ -151,6 +151,34 @@ class IOHandler:
             logging.info("Clearing ancillary folder")
             shutil.rmtree(folder_path)
 
+    @staticmethod
+    def read_fanfar_file(file: str) -> pd.DataFrame:
+        """
+        Read a FANFAR file and return a DataFrame with the time index and values.
+        :param file:
+        :return:
+        """
+        with open(file) as f:
+            lines = f.readlines()
+        # Parse metadata
+        meta = {}
+        for line in lines:
+            if "=" in line:
+                key, val = line.strip().split("=")
+                meta[key] = val
+        # DateStart as datetime (format YYYYMMDDHHMM)
+        start = dt.datetime.strptime(meta["DateStart"], "%Y%m%d%H%M")
+        step_min = int(meta["Temp.Resolution"])
+        # Read line 7 for values
+        values = np.fromstring(lines[6], sep=" ")
+        # Build time index
+        time_index = [start + dt.timedelta(minutes=step_min * i) for i in range(len(values))]
+        # Build DataFrame
+        df = pd.DataFrame({"value": values}, index=pd.DatetimeIndex(time_index))
+
+        return df
+
+
 
 def format_path_with_time(path_template: str, date_time: dt.datetime) -> str:
     """
