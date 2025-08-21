@@ -8,7 +8,7 @@ import pandas as pd
 import geopandas as gpd
 from common.settings import Settings
 from common.logging_handler import set_logging_stream
-from hydro.flood_gridded_return_period import CalculateFloodReturnPeriod
+from hydro.flood_df_return_period import CalculateFloodReturnPeriod
 from hydro.flood_hazard_mapping import FloodHazardMerge
 from hydro.flood_impact_assessment import ImpactAssessment, initialize_subdomain_inputs
 from common.classification import ImpactClassifier
@@ -51,34 +51,32 @@ def main(settings_file: str, alg_time: str, domain: str = None) -> None:
     date_now, forecast_end = parse_algorithm_time(alg_time, settings['settings']['forecast_length_h'])
 
     # Create HazardAssessment instance
-    rp_file = CalculateFloodReturnPeriod(
+    rp_df = CalculateFloodReturnPeriod(
          forecast_length_h=settings['settings']['forecast_length_h'],
-         thresholds=settings['settings']['thresholds'],
          distribution=settings['settings']['distribution'],
          static_data=settings['static_data']['hydro'],
          input_data=settings['input'],
          ancillary_folder=settings['ancillary']['folder'],
-         outcome_folder=settings['outcome']['return_period']['folder'],
-         outcome_filename=settings['outcome']['return_period']['file_name'],
          clear_ancillary_flag=settings['flags']['clear_ancillary'],
-         skip_missing_models=settings['flags']['skip_missing_models'],
-         save_return_period_shapefile=settings['flags']['save_return_period_shapefile'],
          shapefile_folder=settings['outcome']['return_period_shapefile']['folder'],
          shapefile_filename=settings['outcome']['return_period_shapefile']['file_name']
      ).run(date_now, forecast_end)
 
     # Run flood hazard mapping
+    rp_df.loc[rp_df['section'] == 201172, "T"] = 50     ##### TEST
+    rp_df.loc[rp_df['section'] == 202539, "T"] = 100
     hazard_dict = settings['static_data']['hazard']
+
     flood_map, levels_sections = FloodHazardMerge(
-         section_map=hazard_dict["section_file"]["file_name"],
-         section_map_field=hazard_dict["section_file"]["field"],
+         section_map=None,
+         section_map_field=None,
          return_periods=hazard_dict["return_period"],
          flood_maps_template=hazard_dict["flood_maps"],
          decode_map=hazard_dict["decode_map"],
          outcome_folder=settings['outcome']['flood_map']['folder'],
          outcome_filename=settings['outcome']['flood_map']["file_name"],
          skip_empty_maps=settings['flags']['skip_empty_floodmaps']
-    ).run(date_now, rp_file)
+    ).run(date_now, rp_file="", section_T_df=rp_df)
 
     logging.info("Perform impact assessment")
     # Read the shapefile for the whole domain

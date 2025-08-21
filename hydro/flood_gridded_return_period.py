@@ -184,10 +184,11 @@ class CalculateFloodReturnPeriod:
 
         # Conditionally save the shapefile
         if self.save_return_period_shapefile:
-            hydro_tools = HydroTools(self.static_data['area'], self.static_data['areacell'], self.static_data['direction'])
+            hydro_tools = HydroTools(os.path.dirname(self.static_data['area']), os.path.basename(self.static_data['area']).split(".")[0])
             maps_to_extract = {"rp": np.floor(rp).astype("int")}
             gdf = hydro_tools.extract_river_geodataframe(area_limit=self.thresholds['area_km'], maps_to_extract=maps_to_extract, include_log_area=True)
             output_shapefile_path = format_path_with_time(os.path.join(self.shapefile_folder, self.shapefile_filename), date_now)
+            os.makedirs(os.path.dirname(output_shapefile_path), exist_ok=True)
             gdf.to_file(output_shapefile_path, driver="ESRI Shapefile")
             logging.info("Return period shapefile has been created successfully.")
 
