@@ -58,7 +58,7 @@ class CalculateFloodReturnPeriod:
         results = pd.DataFrame(columns=sections, index=pd.date_range(date_start, date_end, freq="D"))
 
         for section in sections:
-            file = os.path.join(format_path_with_time(out_fanfar_path, date_start), f"hydrograph__{section}_{date_start.strftime('%Y%m%d')}0855.txt")
+            file = os.path.join(format_path_with_time(out_fanfar_path, date_start), f"hydrograph__{section}.txt")
             if os.path.isfile(file):
                 logging.debug(f"Reading FANFAR result file {file}")
                 frc = IOHandler.read_fanfar_file(file)
