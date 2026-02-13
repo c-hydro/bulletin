@@ -22,6 +22,40 @@ class IOHandler:
             os.makedirs(path, exist_ok=True)
 
     @staticmethod
+    def read_vector(file_path: str) -> gpd.GeoDataFrame:
+        """
+        Read a vector file (shapefile, GeoJSON, GeoPackage...) using GeoPandas.
+
+        :param file_path: Path to the vector file.
+        :return: GeoDataFrame.
+        """
+        logging.debug(f"Reading vector from {file_path}")
+        if not os.path.exists(file_path):
+            raise FileNotFoundError(file_path)
+        gdf = gpd.read_file(file_path)
+        if gdf.empty:
+            raise ValueError(f"Vector file is empty: {file_path}")
+        return gdf
+
+    @staticmethod
+    def open_netcdf_dataset(nc_path: str) -> xr.Dataset:
+        """
+        Open a NetCDF dataset.
+
+        :param nc_path: Path to the NetCDF file.
+        :return: xarray Dataset.
+        """
+        logging.debug(f"Opening NetCDF dataset: {nc_path}")
+        if not os.path.exists(nc_path):
+            raise FileNotFoundError(nc_path)
+        return xr.open_dataset(nc_path)
+
+
+
+
+
+
+    @staticmethod
     def read_raster(file_path: str, memory_map: bool = False) -> xr.DataArray:
         """
         Read a raster file.
@@ -39,6 +73,22 @@ class IOHandler:
             logging.debug(f"Flipping y-axis for {file_path}")
             raster = raster.reindex(y=raster.y[::-1])
         return raster
+
+    @staticmethod
+    def write_raster(raster: xr.DataArray, out_path: str, nodata: float = None, compress: str = "DEFLATE") -> None:
+        """
+        Write an xarray DataArray (with rioxarray spatial metadata) to GeoTIFF.
+
+        :param raster: DataArray with .rio accessor
+        :param out_path: Output GeoTIFF path
+        :param nodata: Optional nodata value
+        :param compress: Compression (default DEFLATE)
+        """
+        logging.info(f"Writing raster to {out_path}")
+        os.makedirs(os.path.dirname(out_path), exist_ok=True)
+        if nodata is not None:
+            raster = raster.rio.write_nodata(nodata, inplace=False)
+        raster.rio.to_raster(out_path, compress=compress)
 
     @staticmethod
     def write_tif(data: np.ndarray, lon: np.ndarray, lat: np.ndarray, out_filename: str, crs: str = 'epsg:4326', nodata: int = -9999, dtype: str = 'float32') -> None:
@@ -113,71 +163,21 @@ class IOHandler:
         logging.info(f"Extracting HMC results from {date_start} to {date_end}")
         results = []
         for time_now in pd.date_range(date_start, date_end, freq="h"):
-            file = os.path.join(out_hmc_path, f"hmc.output-grid.{time_now.strftime('%Y%m%d%H%M')}.nc")
-            if os.path.isfile(file + ".gz"):
-                logging.debug(f"Unzipping file {file}.gz")
-                gunzip_file(file + ".gz", file)
-            if os.path.isfile(file):
-                logging.debug(f"Reading HMC result file {file}")
-                file_now = xr.open_dataset(file)
-                results.append(file_now["Discharge"].values)
-                if lat is None:
-                    lon = file_now['Longitude'].values[0, :]
-                    lat = file_now['Latitude'].values[:, 0]
+            file_path = os.path.join(out_hmc_path, time_now.strftime("%Y%m%d%H%M") + "_hmc.out.nc")
+            if os.path.exists(file_path):
+                ds = xr.open_dataset(file_path)
+                if lat is None or lon is None:
+                    lat = ds["lat"].values
+                    lon = ds["lon"].values
                 if mask is None:
-                    mask = np.where(file_now["SM"].values < 0, 0, 1)
+                    mask = ds["mask"].values
+                result = ds["Qout"].values
+                if mask is not None:
+                    result = np.where(mask == 1, result, np.nan)
+                results.append(result)
             else:
-                logging.error(f"Output file {file} not found!")
-                raise FileNotFoundError(f"Output file {file} not found!")
-            os.remove(file)
-
-        # Check and flip y-axis if necessary
-        if lat[0] < lat[-1]:
-            logging.debug("Flipping y-axis for extracted HMC results")
-            results = [np.flipud(result) for result in results]
-            lat = lat[::-1]
-
+                logging.warning(f"File {file_path} does not exist")
         return results, mask, lon, lat
-
-    @staticmethod
-    def clear_ancillary_folder(folder_path: str, clear_flag: bool) -> None:
-        """
-        Clear the ancillary folder if the clear flag is set.
-
-        :param folder_path: Path to the ancillary folder.
-        :param clear_flag: Boolean flag to clear the folder.
-        """
-        if clear_flag:
-            logging.info("Clearing ancillary folder")
-            shutil.rmtree(folder_path)
-
-    @staticmethod
-    def read_fanfar_file(file: str) -> pd.DataFrame:
-        """
-        Read a FANFAR file and return a DataFrame with the time index and values.
-        :param file:
-        :return:
-        """
-        with open(file) as f:
-            lines = f.readlines()
-        # Parse metadata
-        meta = {}
-        for line in lines:
-            if "=" in line:
-                key, val = line.strip().split("=")
-                meta[key] = val
-        # DateStart as datetime (format YYYYMMDDHHMM)
-        start = dt.datetime.strptime(meta["DateStart"], "%Y%m%d%H%M")
-        step_min = int(meta["Temp.Resolution"])
-        # Read line 7 for values
-        values = np.fromstring(lines[6], sep=" ")
-        # Build time index
-        time_index = [start + dt.timedelta(minutes=step_min * i) for i in range(len(values))]
-        # Build DataFrame
-        df = pd.DataFrame({"value": values}, index=pd.DatetimeIndex(time_index))
-
-        return df
-
 
 
 def format_path_with_time(path_template: str, date_time: dt.datetime) -> str:
@@ -194,51 +194,30 @@ def format_path_with_time(path_template: str, date_time: dt.datetime) -> str:
 
 def replace_keys(value, replacements: dict[str, str]):
     """
-    Replace keys in a string with their corresponding values.
+    Replace keys in a string with values from a replacements dictionary.
 
-    :param value: String with keys to replace.
-    :param replacements: Dictionary of replacements.
-    :return: String with replaced keys or the original value if it's not a string.
+    :param value: The string to perform replacements on.
+    :param replacements: A dictionary with keys to replace and their replacement values.
+    :return: The updated string with replacements applied.
     """
     if isinstance(value, str):
         for key, replacement in replacements.items():
-            try:
-                value = value.replace(f"{{{key}}}", replacement)
-            except:
-                pass
+            value = value.replace(key, replacement)
     return value
 
-def update_file_paths(file_paths, replacements: dict[str, str]):
-    """
-    Update file paths with replacements.
 
-    :param file_paths: File paths to update.
-    :param replacements: Dictionary of replacements.
-    :return: Updated file paths.
+def update_file_paths(settings: dict, time_now: dt.datetime, keys_to_update: list[str], logger: logging.Logger) -> dict:
     """
-    if isinstance(file_paths, dict):
-        updated_files = {}
-        for key, value in file_paths.items():
-            if isinstance(value, dict):
-                updated_files[key] = update_file_paths(value, replacements)
-            elif isinstance(value, list):
-                updated_files[key] = [replace_keys(f, replacements) for f in value]
-            else:
-                updated_files[key] = replace_keys(value, replacements)
-        return updated_files
-    elif isinstance(file_paths, list):
-        return [replace_keys(f, replacements) for f in file_paths]
-    else:
-        return replace_keys(file_paths, replacements)
+    Update file paths in a settings dictionary by formatting path templates with a given date and time.
 
-def gunzip_file(gz_file_path: str, output_file_path: str) -> None:
+    :param settings: Settings dictionary.
+    :param time_now: Current date and time.
+    :param keys_to_update: List of keys to update in the settings dictionary.
+    :param logger: Logger instance.
+    :return: Updated settings dictionary.
     """
-    Unzip a gzip file.
-
-    :param gz_file_path: Path to the gzip file.
-    :param output_file_path: Path to the output file.
-    """
-    logging.debug(f"Gunzipping file {gz_file_path} to {output_file_path}")
-    with gzip.open(gz_file_path, 'rb') as f_in:
-        with open(output_file_path, 'wb') as f_out:
-            shutil.copyfileobj(f_in, f_out)
+    for key in keys_to_update:
+        if key in settings:
+            logger.debug(f"Updating file paths for {key}")
+            settings[key] = format_path_with_time(settings[key], time_now)
+    return settings
