@@ -1,0 +1,83 @@
+{
+  "flags": {
+    "clear_ancillary": false,
+    "skip_missing_models": false
+  },
+  "settings": {
+    "domain": "pemba",
+    "model_blend": "max",
+    "rolling": "sum",
+    "water_depth_threshold": 0.1,
+    "scenario_merging": "combine",
+    "pixel_spatial_aggregation": {
+      "method": "weighted_quantile",
+      "quantile": 0.8,
+      "central_weight": 0.4
+    }
+  },
+  "static_data": {
+    "shapefile_point": "/home/andrea/Projects/SAIO/pemba/pemba_point.shp",
+    "flood_scenarios": "/home/andrea/Projects/SAIO/pemba/flood_maps/{duration}/Risultato_Pemba_{scenario}_WD_CUT.tif",
+    "admin_map": "/home/andrea/Projects/SAIO/pemba/Limites_Administrativos.shp",
+    "rain_thresholds": {
+        "24h": {
+          "thresholds_mm": [40, 50, 70, 80, 100, 125, 150, 200, 250, 270],
+          "scenarios": [0, 1, 2, 3, 4, 5, 6, 7 , 8, 9]
+        },
+        "48h": {
+          "thresholds_mm": [50, 70, 100, 125, 150, 200, 250, 300, 350, 400, 420],
+          "scenarios": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+        },
+        "72h": {
+          "thresholds_mm": [50, 70, 100, 125, 150, 200, 250, 300, 350, 400, 420, 450, 500],
+          "scenarios": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]
+        }
+    },
+    "hazard_classification": {
+      "1": 0.01,
+      "2": 0.1,
+      "3": 0.3,
+      "4": 0.5
+    }
+  },
+  "input": {
+    "ecmwfIFS": {
+      "filename": "/home/andrea/Projects/SAIO/pemba/model/%Y/%m/%d/%Y%m%d%H_ecmwfIFSopenData-MOC.nc",
+      "varname": "tp",
+      "weight": 0.25,
+      "decumulate_rain": false
+    },
+    "ecmwfAIFS": {
+      "filename": "/home/andrea/Projects/SAIO/pemba/model/%Y/%m/%d/%Y%m%d%H_ecmwfAIFSopenData-MOC.nc",
+      "varname": "tp",
+      "weight": 0.25,
+      "decumulate_rain": false
+    },
+    "icon": {
+      "filename": "/home/andrea/Projects/SAIO/pemba/model/%Y/%m/%d/%Y%m%d%H_icon0p125-MOC.nc",
+      "varname": "tp",
+      "weight": 0.25,
+      "decumulate_rain": false
+    },
+    "gfs": {
+      "filename": "/home/andrea/Projects/SAIO/pemba/model/%Y/%m/%d/MOC_gfs0p25_%Y%m%d%H.nc",
+      "varname": "tp",
+      "weight": 0.25,
+      "decumulate_rain": false
+    }
+  },
+  "outcome": {
+    "worst_scenario": {
+      "folder": "/home/andrea/Projects/SAIO/pemba/outcome/hazard/%Y/%m/%d/%H/",
+      "file_name": "%Y%m%d%H%M_floodScenario.tif"
+    },
+    "classified_maps": {
+      "folder": "/home/andrea/Projects/SAIO/pemba/outcome/impact/%Y/%m/%d/%H/",
+      "file_name": "%Y%m%d%H%M_flood-classes.shp"
+    }
+  },
+  "log": {
+    "folder": "/home/andrea/Projects/SAIO/pemba/log/",
+    "file_name": "hazard_assessment.txt"
+  }
+}

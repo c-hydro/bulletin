@@ -1,0 +1,10 @@
+xarray
+pandas
+numpy
+pytz
+rioxarray
+netCDF4
+geopandas
+dask
+scipy
+git+https://github.com/Ouranosinc/lmoments3.git@v1.0.6
