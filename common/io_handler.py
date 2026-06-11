@@ -1,13 +1,15 @@
-import xarray as xr
-import os
-import pandas as pd
-import numpy as np
 import datetime as dt
 import gzip
-import shutil
 import logging
-import rioxarray as rxr
+import os
+import shutil
+
 import geopandas as gpd
+import numpy as np
+import pandas as pd
+import rioxarray as rxr
+import xarray as xr
+
 
 class IOHandler:
     @staticmethod
@@ -50,11 +52,6 @@ class IOHandler:
             raise FileNotFoundError(nc_path)
         return xr.open_dataset(nc_path)
 
-
-
-
-
-
     @staticmethod
     def read_raster(file_path: str, memory_map: bool = False) -> xr.DataArray:
         """
@@ -66,7 +63,7 @@ class IOHandler:
         """
         logging.debug(f"Reading raster from {file_path}")
         if memory_map:
-            raster = rxr.open_rasterio(file_path, chunks={'band': 1}, cache=False).squeeze()
+            raster = rxr.open_rasterio(file_path, chunks={"band": 1}, cache=False).squeeze()
         else:
             raster = rxr.open_rasterio(file_path, cache=False).squeeze()
         if raster.y[0] < raster.y[-1]:
@@ -75,23 +72,38 @@ class IOHandler:
         return raster
 
     @staticmethod
-    def write_raster(raster: xr.DataArray, out_path: str, nodata: float = None, compress: str = "DEFLATE") -> None:
+    def write_raster(
+        raster: xr.DataArray,
+        out_path: str,
+        nodata: float = None,
+        compress: str = "DEFLATE",
+    ) -> None:
         """
-        Write an xarray DataArray (with rioxarray spatial metadata) to GeoTIFF.
+        Write an xarray DataArray with rioxarray spatial metadata to GeoTIFF.
 
-        :param raster: DataArray with .rio accessor
-        :param out_path: Output GeoTIFF path
-        :param nodata: Optional nodata value
-        :param compress: Compression (default DEFLATE)
+        :param raster: DataArray with .rio accessor.
+        :param out_path: Output GeoTIFF path.
+        :param nodata: Optional nodata value.
+        :param compress: Compression method.
         """
         logging.info(f"Writing raster to {out_path}")
-        os.makedirs(os.path.dirname(out_path), exist_ok=True)
+        out_dir = os.path.dirname(out_path)
+        if out_dir:
+            os.makedirs(out_dir, exist_ok=True)
         if nodata is not None:
             raster = raster.rio.write_nodata(nodata, inplace=False)
         raster.rio.to_raster(out_path, compress=compress)
 
     @staticmethod
-    def write_tif(data: np.ndarray, lon: np.ndarray, lat: np.ndarray, out_filename: str, crs: str = 'epsg:4326', nodata: int = -9999, dtype: str = 'float32') -> None:
+    def write_tif(
+        data: np.ndarray,
+        lon: np.ndarray,
+        lat: np.ndarray,
+        out_filename: str,
+        crs: str = "epsg:4326",
+        nodata: int = -9999,
+        dtype: str = "float32",
+    ) -> None:
         """
         Write data to a GeoTIFF file.
 
@@ -104,14 +116,33 @@ class IOHandler:
         :param dtype: Data type.
         """
         logging.info(f"Writing TIF to {out_filename}")
+        out_dir = os.path.dirname(out_filename)
+        if out_dir:
+            os.makedirs(out_dir, exist_ok=True)
         out_ds = xr.DataArray(data, dims=["y", "x"], coords={"y": lat, "x": lon})
         out_ds.values = np.where(out_ds.values == nodata, nodata, out_ds.values.astype(dtype))
         out_ds = out_ds.rio.write_crs(crs, inplace=True).rio.write_nodata(nodata, inplace=True)
-        out_ds.rio.to_raster(out_filename, driver="GTiff", crs=crs, height=len(lat), width=len(lon), dtype=out_ds.dtype,
-                         compress="DEFLATE", nodata=nodata)
+        out_ds.rio.to_raster(
+            out_filename,
+            driver="GTiff",
+            crs=crs,
+            height=len(lat),
+            width=len(lon),
+            dtype=out_ds.dtype,
+            compress="DEFLATE",
+            nodata=nodata,
+        )
 
     @staticmethod
-    def save_impact_shapefiles(exposed_element: str, folder_name: str, file_name: str, domain_shape: gpd.GeoDataFrame, impacts_table: pd.DataFrame, hazard: str, rounding: bool = False) -> None:
+    def save_impact_shapefiles(
+        exposed_element: str,
+        folder_name: str,
+        file_name: str,
+        domain_shape: gpd.GeoDataFrame,
+        impacts_table: pd.DataFrame,
+        hazard: str,
+        rounding: bool = False,
+    ) -> None:
         """
         Save impact data to shapefiles.
 
@@ -132,52 +163,129 @@ class IOHandler:
         if domain_shape.crs is None:
             domain_shape.crs = "epsg:4326"
 
-        # Shorten the hazard name to ensure field names do not exceed 10 characters
         short_hazard = hazard[:6]
-
-        # Save the total impacts
         domain_shape[short_hazard + "_tot"] = impacts_table[hazard + "_tot_" + exposed_element]
 
-        # Save sub-categories if they exist
         for col in impacts_table.columns:
             if col.startswith(hazard + "_tot_" + exposed_element + "_"):
                 sub_category = col.replace(hazard + "_tot_" + exposed_element + "_", "")
-                short_sub_category = sub_category[:6]  # Shorten sub_category if necessary
+                short_sub_category = sub_category[:6]
                 domain_shape["tot_" + short_sub_category] = impacts_table[col]
 
         domain_shape.to_file(output_file)
 
     @staticmethod
-    def extract_hmc_results(out_hmc_path: str, date_start: dt.datetime, date_end: dt.datetime, mask: np.ndarray = None, lat: np.ndarray = None, lon: np.ndarray = None) -> tuple[list[np.ndarray], np.ndarray, np.ndarray, np.ndarray]:
+    def extract_hmc_results(
+        out_hmc_path: str,
+        date_start: dt.datetime,
+        date_end: dt.datetime,
+        mask: np.ndarray = None,
+        lat: np.ndarray = None,
+        lon: np.ndarray = None,
+    ) -> tuple[list[np.ndarray], np.ndarray, np.ndarray, np.ndarray]:
         """
         Extract HMC results for a given date range.
 
-        :param out_hmc_path: Path to HMC output files.
-        :param date_start: Start date.
-        :param date_end: End date.
-        :param mask: Optional mask array.
-        :param lat: Optional latitude values.
-        :param lon: Optional longitude values.
-        :return: Tuple of results, mask, longitude, and latitude.
+        Supports both:
+        - generic files: YYYYMMDDHHMM_hmc.out.nc with Qout/lat/lon/mask
+        - Continuum/HMC files: hmc.output-grid.YYYYMMDDHHMM.nc(.gz) with
+          Discharge/Longitude/Latitude/SM
         """
         logging.info(f"Extracting HMC results from {date_start} to {date_end}")
         results = []
         for time_now in pd.date_range(date_start, date_end, freq="h"):
-            file_path = os.path.join(out_hmc_path, time_now.strftime("%Y%m%d%H%M") + "_hmc.out.nc")
-            if os.path.exists(file_path):
-                ds = xr.open_dataset(file_path)
-                if lat is None or lon is None:
-                    lat = ds["lat"].values
-                    lon = ds["lon"].values
-                if mask is None:
-                    mask = ds["mask"].values
-                result = ds["Qout"].values
-                if mask is not None:
-                    result = np.where(mask == 1, result, np.nan)
-                results.append(result)
-            else:
-                logging.warning(f"File {file_path} does not exist")
+            timestamp = time_now.strftime("%Y%m%d%H%M")
+            generic_file = os.path.join(out_hmc_path, f"{timestamp}_hmc.out.nc")
+            continuum_file = os.path.join(out_hmc_path, f"hmc.output-grid.{timestamp}.nc")
+
+            if os.path.exists(generic_file):
+                with xr.open_dataset(generic_file) as ds:
+                    if lat is None or lon is None:
+                        lat = ds["lat"].values
+                        lon = ds["lon"].values
+                    if mask is None and "mask" in ds:
+                        mask = ds["mask"].values
+                    result = ds["Qout"].values
+                    if mask is not None:
+                        result = np.where(mask == 1, result, np.nan)
+                    results.append(result)
+                continue
+
+            created_tmp_file = False
+            if os.path.isfile(continuum_file + ".gz"):
+                logging.debug(f"Unzipping file {continuum_file}.gz")
+                gunzip_file(continuum_file + ".gz", continuum_file)
+                created_tmp_file = True
+
+            if os.path.isfile(continuum_file):
+                with xr.open_dataset(continuum_file) as ds:
+                    results.append(ds["Discharge"].values)
+                    if lat is None or lon is None:
+                        lon = ds["Longitude"].values[0, :]
+                        lat = ds["Latitude"].values[:, 0]
+                    if mask is None and "SM" in ds:
+                        mask = np.where(ds["SM"].values < 0, 0, 1)
+                if created_tmp_file and os.path.isfile(continuum_file):
+                    os.remove(continuum_file)
+                continue
+
+            logging.warning(f"No HMC output found for {timestamp} in {out_hmc_path}")
+
+        if len(results) == 0:
+            raise FileNotFoundError(f"No HMC output found in {out_hmc_path}")
+
+        if lat is not None and len(lat) > 1 and lat[0] < lat[-1]:
+            logging.debug("Flipping y-axis for extracted HMC results")
+            results = [np.flipud(result) for result in results]
+            lat = lat[::-1]
+
         return results, mask, lon, lat
+
+    @staticmethod
+    def clear_ancillary_folder(folder_path: str, clear_flag: bool) -> None:
+        """
+        Clear the ancillary folder if the clear flag is set.
+
+        :param folder_path: Path to the ancillary folder.
+        :param clear_flag: Boolean flag to clear the folder.
+        """
+        if clear_flag and os.path.isdir(folder_path):
+            logging.info(f"Clearing ancillary folder: {folder_path}")
+            shutil.rmtree(folder_path)
+
+    @staticmethod
+    def read_fanfar_file(file: str) -> pd.Series:
+        """
+        Read a FANFAR hydrograph text file.
+
+        Expected metadata includes DateStart (YYYYMMDDHHMM) and Temp.Resolution
+        in minutes. The discharge values are read from the first numeric data row.
+        """
+        logging.debug(f"Reading FANFAR file {file}")
+        with open(file) as f:
+            lines = f.readlines()
+
+        meta: dict[str, str] = {}
+        values = None
+        for line in lines:
+            stripped = line.strip()
+            if not stripped:
+                continue
+            if "=" in stripped:
+                key, value = stripped.split("=", 1)
+                meta[key] = value
+                continue
+            parsed = np.fromstring(stripped, sep=" ")
+            if parsed.size > 0 and values is None:
+                values = parsed
+
+        if values is None:
+            raise ValueError(f"No data values found in FANFAR file: {file}")
+
+        start = dt.datetime.strptime(meta["DateStart"], "%Y%m%d%H%M")
+        step_min = int(meta["Temp.Resolution"])
+        time_index = [start + dt.timedelta(minutes=step_min * i) for i in range(len(values))]
+        return pd.Series(values, index=pd.DatetimeIndex(time_index), name="value")
 
 
 def format_path_with_time(path_template: str, date_time: dt.datetime) -> str:
@@ -194,30 +302,70 @@ def format_path_with_time(path_template: str, date_time: dt.datetime) -> str:
 
 def replace_keys(value, replacements: dict[str, str]):
     """
-    Replace keys in a string with values from a replacements dictionary.
+    Replace keys in a string with their corresponding values.
 
-    :param value: The string to perform replacements on.
-    :param replacements: A dictionary with keys to replace and their replacement values.
-    :return: The updated string with replacements applied.
+    Supports the placeholder style {key}. As a fallback, also supports raw key
+    replacement for older utilities that may pass unbraced tokens.
     """
     if isinstance(value, str):
         for key, replacement in replacements.items():
-            value = value.replace(key, replacement)
+            value = value.replace(f"{{{key}}}", str(replacement))
+            value = value.replace(key, str(replacement))
     return value
 
 
-def update_file_paths(settings: dict, time_now: dt.datetime, keys_to_update: list[str], logger: logging.Logger) -> dict:
+def update_file_paths(
+    file_paths,
+    replacements: dict[str, str] = None,
+    keys_to_update: list[str] = None,
+    logger: logging.Logger = None,
+):
     """
-    Update file paths in a settings dictionary by formatting path templates with a given date and time.
+    Update file paths with replacements.
 
-    :param settings: Settings dictionary.
-    :param time_now: Current date and time.
-    :param keys_to_update: List of keys to update in the settings dictionary.
-    :param logger: Logger instance.
-    :return: Updated settings dictionary.
+    Primary usage:
+        update_file_paths(file_paths, {"element": "population"})
+
+    Backward-compatible usage:
+        update_file_paths(settings, time_now, keys_to_update, logger)
+    where the second argument is a datetime and selected settings keys are
+    formatted with strftime.
     """
-    for key in keys_to_update:
-        if key in settings:
-            logger.debug(f"Updating file paths for {key}")
-            settings[key] = format_path_with_time(settings[key], time_now)
-    return settings
+    if isinstance(replacements, dt.datetime):
+        settings = file_paths
+        time_now = replacements
+        updated_keys = keys_to_update or []
+        for key in updated_keys:
+            if key in settings:
+                if logger is not None:
+                    logger.debug(f"Updating file paths for {key}")
+                settings[key] = format_path_with_time(settings[key], time_now)
+        return settings
+
+    replacements = replacements or {}
+    if isinstance(file_paths, dict):
+        updated_files = {}
+        for key, value in file_paths.items():
+            if isinstance(value, dict):
+                updated_files[key] = update_file_paths(value, replacements)
+            elif isinstance(value, list):
+                updated_files[key] = [replace_keys(f, replacements) for f in value]
+            else:
+                updated_files[key] = replace_keys(value, replacements)
+        return updated_files
+    if isinstance(file_paths, list):
+        return [replace_keys(f, replacements) for f in file_paths]
+    return replace_keys(file_paths, replacements)
+
+
+def gunzip_file(gz_file_path: str, output_file_path: str) -> None:
+    """
+    Unzip a gzip file.
+
+    :param gz_file_path: Path to the gzip file.
+    :param output_file_path: Path to the output file.
+    """
+    logging.debug(f"Gunzipping file {gz_file_path} to {output_file_path}")
+    with gzip.open(gz_file_path, "rb") as f_in:
+        with open(output_file_path, "wb") as f_out:
+            shutil.copyfileobj(f_in, f_out)

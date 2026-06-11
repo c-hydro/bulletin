@@ -156,7 +156,7 @@ class PluvialHazardAssessment:
         # Combine maps (pixel-wise max)
         final_da = maps[0]
         for m in maps[1:]:
-            final_da = xr.ufuncs.maximum(final_da, m)
+            final_da = xr.apply_ufunc(np.maximum, final_da, m)
 
         # Restore georeferencing after xarray ufuncs
         ref = maps[0]
