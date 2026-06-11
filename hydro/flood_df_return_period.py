@@ -90,11 +90,15 @@ class CalculateFloodReturnPeriod:
         # drop the columns of parameters not in the sections
         parameters = parameters[parameters.columns.intersection(sections)]
 
-        # Check that parameters are available for all the stations and drop the dis_max values for which parameters are not available, printing a warning
-        if not all(station in parameters.columns for station in sections):
-            missing_stations = set(sections) - set(parameters.index)
-            logging.warning(f"Missing parameters for stations: {missing_stations}. These stations will be excluded from the return period calculation.")
-            dis_max = dis_max[dis_max.index.isin(parameters.index)]
+        available_sections = [section for section in sections if section in parameters.columns and section in dis_max.index]
+        missing_stations = set(sections) - set(available_sections)
+        if missing_stations:
+            logging.warning(
+                f"Missing parameters or discharge values for stations: {missing_stations}. "
+                "These stations will be excluded from the return period calculation."
+            )
+            dis_max = dis_max[dis_max.index.isin(available_sections)]
+            parameters = parameters[available_sections]
         if dis_max.empty:
             raise ValueError("No valid discharge values found after filtering by parameters.")
 
