@@ -45,35 +45,96 @@ def setup_logger(settings: dict, date_now: dt.datetime) -> None:
     set_logging_stream(logger_folder=log_folder, logger_file=log_file, logger_level=logger_level)
 
 
+def resolve_model_name(settings: dict, model_name: str | None = None) -> str:
+    """
+    Resolve the model to run from input.models.
+    """
+    models = settings.get("input", {}).get("models", {})
+    if not models:
+        raise KeyError("input.models missing")
+
+    if model_name is not None:
+        if model_name not in models:
+            raise KeyError(f"Model '{model_name}' not found in input.models")
+        return model_name
+
+    if len(models) == 1:
+        return next(iter(models.keys()))
+
+    raise ValueError("Multiple input.models configured. Use -model for the single-model workflow.")
+
+
+def get_model_settings(settings: dict, model_name: str) -> dict:
+    """
+    Get settings for one model.
+    """
+    return settings["input"]["models"][model_name]
+
+
+def get_model_flags(settings: dict, model_settings: dict) -> dict:
+    """
+    Merge global flags with optional model-specific flags.
+    """
+    flags = dict(settings.get("flags", {}))
+    flags.update(model_settings.get("flags", {}))
+    return flags
+
+
+def get_model_time_tokens(settings: dict, model_name: str, model_settings: dict, date_now: dt.datetime) -> dict:
+    """
+    Build time and model tokens, allowing model-specific template overrides.
+    """
+    template_settings = dict(settings.get("settings", {}).get("template", {}))
+    template_settings.update(model_settings.get("template", {}))
+    return build_time_tokens(template_settings, date_now, extra_tokens={"model": model_name})
+
+
+def format_path_from_cfg(path_cfg: dict, tokens: dict, date_now: dt.datetime) -> str:
+    """
+    Build a dated path from a {"folder", "file_name"} settings block.
+    """
+    return format_path_with_time(
+        update_file_paths(os.path.join(path_cfg["folder"], path_cfg["file_name"]), tokens),
+        date_now,
+    )
+
+
+def build_gridded_hazard_path(settings: dict, date_now: dt.datetime, model_name: str) -> str:
+    """
+    Build the gridded hazard path from outcome.gridded_hazard.
+    """
+    model_settings = get_model_settings(settings, model_name)
+    tokens = get_model_time_tokens(settings, model_name, model_settings, date_now)
+    return format_path_from_cfg(settings["outcome"]["gridded_hazard"], tokens, date_now)
+
+
 def run_hazard_stage(settings: dict, date_now: dt.datetime, model_name: str | None = None) -> tuple[str, str, object]:
     """
     Run forecast input and gridded hazard classification.
     """
-    flags = settings.get("flags", {})
     set_cfg = settings.get("settings", {})
-    input_cfg = settings.get("input", {})
     static_cfg = settings.get("static_data", {})
     ancillary_cfg = settings.get("ancillary", {})
     outcome_cfg = settings.get("outcome", {})
 
-    model_name = model_name or set_cfg.get("model") or input_cfg.get("model")
+    model_name = resolve_model_name(settings, model_name)
+    model_settings = get_model_settings(settings, model_name)
+    flags = get_model_flags(settings, model_settings)
     hazards = set_cfg["hazards"]
     forecast_length_h = int(set_cfg["forecast_length_h"])
     forecast_resolution_h = float(set_cfg.get("forecast_resolution_h", 1))
     rain_window_h = float(set_cfg.get("rain_window_h", 24))
     forecast_end = date_now + dt.timedelta(hours=forecast_length_h - 1)
 
-    template_settings = set_cfg.get("template", {})
-    extra_tokens = {"model": model_name} if model_name is not None else {}
-    tokens = build_time_tokens(template_settings, date_now, extra_tokens=extra_tokens)
+    tokens = get_model_time_tokens(settings, model_name, model_settings, date_now)
 
-    source = str(input_cfg.get("source", "local")).lower()
-    variables_settings = input_cfg["variables"]
+    source = str(model_settings.get("source", "local")).lower()
+    variables_settings = model_settings["variables"]
     variables = build_variables(variables_settings, date_now, tokens=tokens)
 
     input_handler = MeteoForecastInput()
     if source == "drops2":
-        drops_cfg = input_cfg["drops2"]
+        drops_cfg = model_settings["drops2"]
         date_from = date_now - dt.timedelta(hours=int(drops_cfg.get("past_time_search_window_h", 0)))
         date_to = date_now + dt.timedelta(hours=int(drops_cfg.get("future_time_search_window_h", 0)))
         variables_dic, date_ref = input_handler.read_drops_variables(variables, drops_cfg, date_from, date_to)
@@ -82,7 +143,7 @@ def run_hazard_stage(settings: dict, date_now: dt.datetime, model_name: str | No
         variables_dic = input_handler.read_local_variables(variables, time_tokens=tokens)
         date_ref = date_now
     else:
-        raise NotImplementedError("input.source must be 'local' or 'drops2'")
+        raise NotImplementedError("Model source must be 'local' or 'drops2'")
 
     data = input_handler.build_dataset(variables_dic)
     data = input_handler.crop_bbox(data, set_cfg.get("bbox"))
@@ -90,10 +151,7 @@ def run_hazard_stage(settings: dict, date_now: dt.datetime, model_name: str | No
 
     ancillary_forecast = ancillary_cfg.get("forecast")
     if ancillary_forecast is not None and flags.get("save_ancillary", True):
-        ancillary_forecast_path = format_path_with_time(
-            update_file_paths(os.path.join(ancillary_forecast["folder"], ancillary_forecast["file_name"]), tokens),
-            date_now,
-        )
+        ancillary_forecast_path = format_path_from_cfg(ancillary_forecast, tokens, date_now)
         IOHandler.create_directories([os.path.dirname(ancillary_forecast_path)])
         data.to_netcdf(ancillary_forecast_path)
 
@@ -108,10 +166,7 @@ def run_hazard_stage(settings: dict, date_now: dt.datetime, model_name: str | No
 
     ancillary_daily = ancillary_cfg.get("daily_maxima")
     if ancillary_daily is not None and flags.get("save_ancillary", True):
-        ancillary_daily_path = format_path_with_time(
-            update_file_paths(os.path.join(ancillary_daily["folder"], ancillary_daily["file_name"]), tokens),
-            date_now,
-        )
+        ancillary_daily_path = format_path_from_cfg(ancillary_daily, tokens, date_now)
         IOHandler.create_directories([os.path.dirname(ancillary_daily_path)])
         daily.to_netcdf(ancillary_daily_path)
 
@@ -124,10 +179,7 @@ def run_hazard_stage(settings: dict, date_now: dt.datetime, model_name: str | No
         alert_daily = hazard_handler.apply_sea_mask(alert_daily, static_cfg.get("sea_mask"))
 
     alert_out = outcome_cfg["gridded_hazard"]
-    alert_path = format_path_with_time(
-        update_file_paths(os.path.join(alert_out["folder"], alert_out["file_name"]), tokens),
-        date_now,
-    )
+    alert_path = format_path_from_cfg(alert_out, tokens, date_now)
     IOHandler.create_directories([os.path.dirname(alert_path)])
     alert_daily.to_netcdf(alert_path)
 
@@ -138,15 +190,16 @@ def run_admin_stage(settings: dict, date_now: dt.datetime, alert_daily, model_na
     """
     Run admin-level hazard and impact assessment.
     """
-    flags = settings.get("flags", {})
     set_cfg = settings.get("settings", {})
     static_cfg = settings.get("static_data", {})
     outcome_cfg = settings.get("outcome", {})
 
+    model_name = resolve_model_name(settings, model_name)
+    model_settings = get_model_settings(settings, model_name)
+    flags = get_model_flags(settings, model_settings)
     hazards = set_cfg["hazards"]
     hazards_short = set_cfg.get("hazards_short", [hazard[:4] for hazard in hazards])
-    extra_tokens = {"model": model_name} if model_name is not None else {}
-    tokens = build_time_tokens(set_cfg.get("template", {}), date_now, extra_tokens=extra_tokens)
+    tokens = get_model_time_tokens(settings, model_name, model_settings, date_now)
 
     admin_gdf = IOHandler.read_vector(static_cfg["warning_regions"])
     impact_handler = MeteoImpactAssessment()
@@ -202,7 +255,8 @@ def main(settings_file: str, alg_time: str, domain: str | None = None, model: st
     settings = Settings(settings_file, domain).settings
     date_now = parse_algorithm_time(alg_time)
     setup_logger(settings, date_now)
-    model_name = model or settings.get("settings", {}).get("model") or settings.get("input", {}).get("model")
+    model_name = resolve_model_name(settings, model)
+    model_flags = get_model_flags(settings, get_model_settings(settings, model_name))
 
     start_time = time.time()
     logging.info(" ============================================================================ ")
@@ -211,17 +265,16 @@ def main(settings_file: str, alg_time: str, domain: str | None = None, model: st
 
     try:
         alert_daily = None
-        if settings.get("flags", {}).get("run_hazard", True):
+        if model_flags.get("run_hazard", True):
             alert_path, date_ref, alert_daily = run_hazard_stage(settings, date_now, model_name=model_name)
             logging.info(f"Hazard output written: {alert_path}")
             logging.info(f"Forecast reference time: {date_ref}")
         else:
-            model_token = {"model": model_name} if model_name is not None else {}
-            alert_path = format_path_with_time(update_file_paths(settings["input"]["alert_file"], model_token), date_now)
-            logging.info(f"Reading existing hazard file: {alert_path}")
+            alert_path = build_gridded_hazard_path(settings, date_now, model_name)
+            logging.info(f"Reading existing gridded hazard output: {alert_path}")
             alert_daily = IOHandler.open_netcdf_dataset(alert_path)
 
-        if settings.get("flags", {}).get("run_admin", True):
+        if model_flags.get("run_admin", True):
             run_admin_stage(settings, date_now, alert_daily, model_name=model_name)
 
         time_elapsed = round(time.time() - start_time, 1)
