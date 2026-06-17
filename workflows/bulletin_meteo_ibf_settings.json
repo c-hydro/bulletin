@@ -32,27 +32,6 @@
     }
   },
   "input": {
-    "source": "local",
-    "model": "gfs",
-    "variables": {
-      "rain": {
-        "name": "tp",
-        "file": "/path/to/{domain}/forecast/%Y/%m/%d/%H/{model}_rain.nc",
-        "accumulated": false
-      },
-      "u-wind": {
-        "name": "u10",
-        "file": "/path/to/{domain}/forecast/%Y/%m/%d/%H/{model}_u10.nc",
-        "level": null,
-        "accumulated": false
-      },
-      "v-wind": {
-        "name": "v10",
-        "file": "/path/to/{domain}/forecast/%Y/%m/%d/%H/{model}_v10.nc",
-        "level": null,
-        "accumulated": false
-      }
-    },
     "models": {
       "gfs": {
         "weight": 0.25,
@@ -92,8 +71,7 @@
           }
         }
       }
-    },
-    "alert_file": "/path/to/{domain}/outcome/meteo/hazard/%Y/%m/%d/%H/{model}_meteo_alert.nc"
+    }
   },
   "static_data": {
     "warning_regions": "/path/to/{domain}/static/admin/warning_regions.shp",
