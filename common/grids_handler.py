@@ -2,6 +2,8 @@ import numpy as np
 import pandas as pd
 import geopandas as gpd
 import xarray as xr
+from affine import Affine
+from rasterio import features
 
 
 class GridsHandler:
@@ -105,6 +107,110 @@ class GridsHandler:
         i0 = max(i - 1, 0)
         i1 = min(i + 2, arr.size)  # exclusive
         return i0, i1
+
+    @staticmethod
+    def select_level_if_present(da: xr.DataArray, level: str | int | float | None) -> xr.DataArray:
+        """
+        Select a vertical level if the variable includes a supported level coordinate.
+        """
+        if level is None:
+            return da
+
+        for coord in ["level", "heightAboveGround", "isobaricInhPa"]:
+            if coord in da.coords or coord in da.dims:
+                try:
+                    return da.sel({coord: level})
+                except Exception:
+                    return da.sel({coord: float(level)})
+
+        return da
+
+    @staticmethod
+    def normalize_lat_lon_coordinates(da: xr.DataArray) -> xr.DataArray:
+        """
+        Normalize latitude and longitude coordinate names to lat/lon.
+        """
+        rename_map = {}
+        for src, dst in [("longitude", "lon"), ("latitude", "lat"), ("x", "lon"), ("y", "lat")]:
+            if src in da.coords or src in da.dims:
+                rename_map[src] = dst
+
+        if rename_map:
+            da = da.rename(rename_map)
+
+        if "time" not in da.dims:
+            raise ValueError("Forecast variable must include a time dimension")
+        if "lat" not in da.dims or "lon" not in da.dims:
+            raise ValueError("Forecast variable must include lat/lon dimensions")
+
+        if da.lat.values[-1] < da.lat.values[0]:
+            da = da.sortby("lat")
+
+        return da
+
+    @staticmethod
+    def crop_bbox(data: xr.Dataset, bbox: dict | None = None) -> xr.Dataset:
+        """
+        Crop a Dataset using bbox keys lon_left, lon_right, lat_bottom, lat_top.
+        """
+        if bbox is None:
+            return data
+
+        min_lon = bbox["lon_left"]
+        max_lon = bbox["lon_right"]
+        min_lat = bbox["lat_bottom"]
+        max_lat = bbox["lat_top"]
+
+        lon = np.array(data["lon"].values, copy=True)
+        lon[lon > 180] = lon[lon > 180] - 360
+        data = data.assign_coords(lon=lon)
+
+        mask_lon = (data.lon >= min_lon) & (data.lon <= max_lon)
+        mask_lat = (data.lat >= min_lat) & (data.lat <= max_lat)
+        return data.where(mask_lon & mask_lat, drop=True).sortby("lon")
+
+    @staticmethod
+    def daily_maxima(data: xr.Dataset, date_ref: pd.Timestamp | object, forecast_end: pd.Timestamp | object) -> xr.Dataset:
+        """
+        Calculate daily maximum values over the forecast period.
+        """
+        ds_out_daily = data.resample({"time": "D"}, skipna=True).max()
+        date_ref_ts = pd.Timestamp(date_ref)
+        forecast_end_ts = pd.Timestamp(forecast_end)
+        if date_ref_ts.tz is not None:
+            date_ref_ts = date_ref_ts.tz_convert("UTC").tz_localize(None)
+        if forecast_end_ts.tz is not None:
+            forecast_end_ts = forecast_end_ts.tz_convert("UTC").tz_localize(None)
+        daily_index = pd.date_range(date_ref_ts, forecast_end_ts, freq="D")
+        return ds_out_daily.reindex(time=daily_index, method="nearest")
+
+    @staticmethod
+    def transform_from_latlon(lat: np.ndarray, lon: np.ndarray) -> Affine:
+        """
+        Build an affine transform from 1D latitude and longitude coordinates.
+        """
+        lat = np.asarray(lat)
+        lon = np.asarray(lon)
+        trans = Affine.translation(lon[0], lat[0])
+        scale = Affine.scale(lon[1] - lon[0], lat[1] - lat[0])
+        return trans * scale
+
+    @staticmethod
+    def rasterize_shapes(shapes: list, coords: dict, fill: float = np.nan, **kwargs) -> xr.DataArray:
+        """
+        Rasterize geometry-value tuples onto 1D latitude and longitude coordinates.
+        """
+        transform = GridsHandler.transform_from_latlon(coords["lat"], coords["lon"])
+        out_shape = (len(coords["lat"]), len(coords["lon"]))
+        raster = features.rasterize(
+            shapes,
+            out_shape=out_shape,
+            fill=fill,
+            transform=transform,
+            dtype=float,
+            **kwargs,
+        )
+        return xr.DataArray(raster, coords=coords, dims=("lat", "lon"))
 
     @staticmethod
     def extract_timeseries_at_points(
