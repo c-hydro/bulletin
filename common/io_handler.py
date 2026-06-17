@@ -20,6 +20,8 @@ class IOHandler:
         :param paths: List of directory paths to create.
         """
         for path in paths:
+            if not path:
+                continue
             logging.debug(f"Creating directory {path}")
             os.makedirs(path, exist_ok=True)
 
@@ -304,13 +306,14 @@ def replace_keys(value, replacements: dict[str, str]):
     """
     Replace keys in a string with their corresponding values.
 
-    Supports the placeholder style {key}. As a fallback, also supports raw key
-    replacement for older utilities that may pass unbraced tokens.
+    Supports the placeholder styles {key} and $key. Raw word replacement is
+    intentionally avoided because keys such as "hazard" and "model" can also
+    appear as normal path names.
     """
     if isinstance(value, str):
         for key, replacement in replacements.items():
             value = value.replace(f"{{{key}}}", str(replacement))
-            value = value.replace(key, str(replacement))
+            value = value.replace(f"${key}", str(replacement))
     return value
 
 
