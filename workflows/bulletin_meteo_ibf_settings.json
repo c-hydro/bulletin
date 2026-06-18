@@ -1,11 +1,11 @@
 {
   "flags": {
     "debug": false,
-    "run_hazard": true,
-    "run_admin": true,
+    "run_hazard_classification": true,
+    "run_spatial_aggregation": true,
+    "run_multimodel_merger": true,
     "hazard_assessment": true,
     "impact_assessment": true,
-    "run_merger": true,
     "save_ancillary": true,
     "mask_sea": false,
     "clear_ancillary": false
@@ -17,7 +17,7 @@
     "rain_window_h": 24,
     "min_warning_pixel": 1,
     "hazards": ["rain", "wind"],
-    "hazards_short": ["rai", "win"],
+    "hazards_short": ["rain", "wind"],
     "bbox": {
       "lon_left": 20.0,
       "lon_right": 52.0,
