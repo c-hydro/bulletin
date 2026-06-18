@@ -23,6 +23,51 @@ def is_enabled(flags: dict, key: str, default: bool = True) -> bool:
     return default
 
 
+def str_to_bool(value) -> bool | None:
+    """
+    Convert a CLI boolean-like value to bool.
+    """
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return value
+    value_norm = str(value).strip().lower()
+    if value_norm in {"true", "1", "yes", "y"}:
+        return True
+    if value_norm in {"false", "0", "no", "n"}:
+        return False
+    raise ValueError(f"Invalid boolean value: {value}")
+
+
+def override_flag(settings: dict, key: str, value) -> None:
+    """
+    Override a settings flag when a CLI value is provided.
+    """
+    value_bool = str_to_bool(value)
+    if value_bool is None:
+        return
+    settings.setdefault("flags", {})[key] = value_bool
+
+
+def is_shapefile_complete(path: str) -> bool:
+    """
+    Check that the mandatory shapefile sidecar files exist.
+    """
+    base, ext = os.path.splitext(path)
+    if ext.lower() != ".shp":
+        return os.path.isfile(path)
+    return all(os.path.isfile(base + suffix) for suffix in [".shp", ".shx", ".dbf"])
+
+
+def are_outputs_complete(paths: list[str]) -> bool:
+    """
+    Check a list of output files. Shapefiles require .shp, .shx and .dbf.
+    """
+    if not paths:
+        return False
+    return all(is_shapefile_complete(path) for path in paths)
+
+
 def setup_logger(settings: dict, date_now: dt.datetime) -> None:
     """
     Set up logging from settings.
@@ -92,6 +137,103 @@ def build_gridded_hazard_path(settings: dict, date_now: dt.datetime, model_name:
     model_settings = get_model_settings(settings, model_name)
     tokens = get_model_time_tokens(settings, model_name, model_settings, date_now)
     return format_path_from_cfg(settings["outcome"]["gridded_hazard"], tokens, date_now)
+
+
+def build_model_final_output_paths(settings: dict, date_now: dt.datetime, model_name: str) -> list[str]:
+    """
+    Build the final output paths that define whether one model is complete.
+
+    Impact shapefiles are preferred when impact_assessment is enabled. If impact
+    assessment is disabled, hazard shapefiles are checked. If both spatial
+    outputs are disabled, the gridded hazard NetCDF is used as the completion
+    target.
+    """
+    model_settings = get_model_settings(settings, model_name)
+    model_flags = get_model_flags(settings, model_settings)
+    set_cfg = settings.get("settings", {})
+    static_cfg = settings.get("static_data", {})
+    outcome_cfg = settings.get("outcome", {})
+
+    hazards = set_cfg["hazards"]
+    hazards_short = set_cfg.get("hazards_short", hazards)
+    tokens = get_model_time_tokens(settings, model_name, model_settings, date_now)
+    paths = []
+
+    if is_enabled(model_flags, "impact_assessment", True) and "shape_impacts" in outcome_cfg:
+        impact_out = outcome_cfg["shape_impacts"]
+        impact_settings = static_cfg.get("impacts", {})
+        exposed_elements = impact_settings.get("exposed_map", {}).keys()
+        for exposed_element in exposed_elements:
+            for hazard, hazard_short in zip(hazards, hazards_short):
+                out_path = format_path_with_time(
+                    update_file_paths(
+                        os.path.join(impact_out["folder"], impact_out["file_name"]),
+                        tokens
+                        | {
+                            "hazard": hazard,
+                            "HAZARD": hazard.upper(),
+                            "haz": hazard_short,
+                            "HAZ": hazard_short.upper(),
+                            "exposed_element": exposed_element,
+                        },
+                    ),
+                    date_now,
+                )
+                paths.append(out_path)
+
+    elif is_enabled(model_flags, "hazard_assessment", True) and "shape_hazard" in outcome_cfg:
+        hazard_out = outcome_cfg["shape_hazard"]
+        for hazard, hazard_short in zip(hazards, hazards_short):
+            out_path = format_path_with_time(
+                update_file_paths(
+                    os.path.join(hazard_out["folder"], hazard_out["file_name"]),
+                    tokens
+                    | {
+                        "hazard": hazard,
+                        "HAZARD": hazard.upper(),
+                        "haz": hazard_short,
+                        "HAZ": hazard_short.upper(),
+                    },
+                ),
+                date_now,
+            )
+            paths.append(out_path)
+
+    else:
+        paths.append(build_gridded_hazard_path(settings, date_now, model_name))
+
+    return paths
+
+
+def is_model_complete(settings: dict, date_now: dt.datetime, model_name: str) -> bool:
+    """
+    Return True if all final outputs for one model are present.
+    """
+    return are_outputs_complete(build_model_final_output_paths(settings, date_now, model_name))
+
+
+def build_merger_output_paths(settings: dict, date_now: dt.datetime) -> list[str]:
+    """
+    Build expected multimodel merger output paths.
+    """
+    merger_cfg = settings.get("merger")
+    if merger_cfg is None:
+        return []
+
+    hazards = settings["settings"]["hazards"]
+    hazards_short = settings["settings"].get("hazards_short", hazards)
+    out_template = format_path_with_time(merger_cfg["output_file"], date_now)
+    paths = []
+    for hazard, hazard_short in zip(hazards, hazards_short):
+        paths.append(
+            out_template.format(
+                hazard=hazard,
+                HAZARD=hazard.upper(),
+                haz=hazard_short,
+                HAZ=hazard_short.upper(),
+            )
+        )
+    return paths
 
 
 def build_variables(
@@ -263,22 +405,25 @@ def run_spatial_aggregation(settings: dict, date_now: dt.datetime, alert_daily, 
                 impact_handler.save(out_gdf, out_path)
 
 
-def run_multimodel_merger(settings: dict, date_now: dt.datetime, model_names: list[str]) -> None:
+def run_multimodel_merger(settings: dict, date_now: dt.datetime, model_names: list[str]) -> bool:
     """
-    Merge impact outputs produced for the selected models.
+    Merge impact outputs produced for the selected complete models.
+
+    Returns True when the merger ran successfully, False when it was skipped.
     """
     flags = settings.get("flags", {})
     if not is_enabled(flags, "run_multimodel_merger", True):
-        return
+        logging.info("Multimodel merger disabled by settings. Skipping.")
+        return False
 
-    if len(model_names) < 2:
-        logging.info("Only one model selected. Skipping multimodel merger.")
-        return
+    if not model_names:
+        logging.info("No complete model selected. Skipping multimodel merger.")
+        return False
 
     merger_cfg = settings.get("merger")
     if merger_cfg is None:
         logging.info("No merger settings found. Skipping multimodel merger.")
-        return
+        return False
 
     hazards = settings["settings"]["hazards"]
     hazards_short = settings["settings"].get("hazards_short", hazards)
@@ -298,14 +443,31 @@ def run_multimodel_merger(settings: dict, date_now: dt.datetime, model_names: li
         out_file_template=out_template,
         raise_error_if_missing=bool(merger_cfg.get("raise_error_if_missing", False)),
     )
+    return True
 
 
-def main(settings_file: str, alg_time: str, domain: str | None = None, model: str | None = None) -> None:
+def main(
+    settings_file: str,
+    alg_time: str,
+    domain: str | None = None,
+    model: str | None = None,
+    final: bool = False,
+    rerun_models=None,
+    skip_missing_models=None,
+) -> None:
     """
     Run meteo IBF for one or more models from input.models.
     """
     warnings.filterwarnings("ignore")
     settings = Settings(settings_file, domain).settings
+    override_flag(settings, "rerun_models", rerun_models)
+    override_flag(settings, "skip_missing_models", skip_missing_models)
+
+    if final:
+        settings.setdefault("flags", {})["skip_missing_models"] = True
+        if settings.get("merger") is not None:
+            settings["merger"]["raise_error_if_missing"] = False
+
     date_now = parse_algorithm_time(alg_time)
     setup_logger(settings, date_now)
     model_names = get_model_names(settings, model)
@@ -315,9 +477,29 @@ def main(settings_file: str, alg_time: str, domain: str | None = None, model: st
     logging.info(" ==> START ... ")
     logging.info(f" --> Time now : {alg_time}")
     logging.info(f" --> Models: {', '.join(model_names)}")
+    logging.info(f" --> Final mode: {final}")
 
     try:
+        completed_models = []
+        failed_models = []
+        new_outputs_created = False
+        skip_missing = is_enabled(settings.get("flags", {}), "skip_missing_models", False)
+        rerun_models_flag = is_enabled(settings.get("flags", {}), "rerun_models", True)
+
         for model_name in model_names:
+            model_complete_before = is_model_complete(settings, date_now, model_name)
+            if model_complete_before:
+                completed_models.append(model_name)
+                logging.info(f"Model '{model_name}' final output already complete.")
+                if final or not rerun_models_flag:
+                    logging.info(f"Skipping model '{model_name}'.")
+                    continue
+
+            if final:
+                failed_models.append(model_name)
+                logging.info(f"Final mode: model '{model_name}' is not complete and will not be processed.")
+                continue
+
             logging.info(f" --> Run model: {model_name}")
             model_flags = get_model_flags(settings, get_model_settings(settings, model_name))
 
@@ -337,13 +519,50 @@ def main(settings_file: str, alg_time: str, domain: str | None = None, model: st
 
                 if is_enabled(model_flags, "run_spatial_aggregation", True):
                     run_spatial_aggregation(settings, date_now, alert_daily, model_name=model_name)
+
+                if is_model_complete(settings, date_now, model_name):
+                    if model_name not in completed_models:
+                        completed_models.append(model_name)
+                    if not model_complete_before:
+                        new_outputs_created = True
+                else:
+                    raise RuntimeError(f"Model '{model_name}' finished but final output is incomplete")
+
             except Exception as exc:
-                if is_enabled(settings.get("flags", {}), "skip_missing_models", False):
+                failed_models.append(model_name)
+                if skip_missing:
                     logging.warning(f"Skipping model '{model_name}' due to error: {exc}")
                     continue
                 raise
 
-        run_multimodel_merger(settings, date_now, model_names)
+        completed_models = list(dict.fromkeys(completed_models))
+        failed_models = list(dict.fromkeys(failed_models))
+
+        logging.info(f"Complete models: {', '.join(completed_models) if completed_models else 'none'}")
+        logging.info(f"Missing/failed models: {', '.join(failed_models) if failed_models else 'none'}")
+
+        if not completed_models:
+            raise RuntimeError("No complete model output available. Merger cannot run.")
+
+        if failed_models and not skip_missing:
+            raise RuntimeError(
+                "Some model outputs are missing or failed and skip_missing_models=false: "
+                + ", ".join(failed_models)
+            )
+
+        merger_outputs_complete = are_outputs_complete(build_merger_output_paths(settings, date_now))
+        run_merger = True
+        if merger_outputs_complete and not new_outputs_created and not final:
+            run_merger = is_enabled(settings.get("flags", {}), "rerun_merger", False)
+            if not run_merger:
+                logging.info("Merged output already complete and no new model output was produced. Skipping merger.")
+
+        merger_ran = False
+        if run_merger:
+            merger_ran = run_multimodel_merger(settings, date_now, completed_models)
+
+        if final and not merger_ran and not merger_outputs_complete:
+            raise RuntimeError("Final mode requested but no merged output was produced.")
 
         time_elapsed = round(time.time() - start_time, 1)
         logging.info(" ")
@@ -362,5 +581,16 @@ if __name__ == "__main__":
     parser.add_argument("-time", required=True, help="Algorithm time in 'YYYY-MM-DD HH:MM' format")
     parser.add_argument("-domain", required=False, help="Domain to use, overrides settings file")
     parser.add_argument("-model", required=False, help="Optional model name from input.models")
+    parser.add_argument("--final", action="store_true", help="Run final best-effort merger using complete model outputs only")
+    parser.add_argument("--rerun_models", required=False, help="Override flags.rerun_models with true/false")
+    parser.add_argument("--skip_missing_models", required=False, help="Override flags.skip_missing_models with true/false")
     args = parser.parse_args()
-    main(args.settings_file, args.time, args.domain, args.model)
+    main(
+        args.settings_file,
+        args.time,
+        args.domain,
+        args.model,
+        final=args.final,
+        rerun_models=args.rerun_models,
+        skip_missing_models=args.skip_missing_models,
+    )
