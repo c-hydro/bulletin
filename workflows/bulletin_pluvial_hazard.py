@@ -6,7 +6,11 @@ import warnings
 import os
 
 from common.settings import Settings
-from common.logging_handler import set_logging_stream, reset_logging_stream
+from common.logging_handler import (
+    log_workflow_exception,
+    reset_logging_stream,
+    set_logging_stream,
+)
 from common.io_handler import IOHandler, format_path_with_time
 
 from pluvial.pluvial_input import PluvialInputManager, ModelInput
@@ -175,6 +179,9 @@ def main(settings_file: str, alg_time: str, domain: str | None = None) -> None:
         logging.info(f"Hazard raster written: {out_worst_path}")
         logging.info(f"Admin impacts written: {out_class_path}")
 
+    except Exception as exc:
+        log_workflow_exception("Pluvial hazard workflow", exc)
+        raise
     finally:
         # Always reset logging streams/handlers
         reset_logging_stream(logger_name)

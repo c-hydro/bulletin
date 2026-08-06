@@ -20,6 +20,8 @@ class IOHandler:
         :param paths: List of directory paths to create.
         """
         for path in paths:
+            if not path:
+                continue
             logging.debug(f"Creating directory {path}")
             os.makedirs(path, exist_ok=True)
 
@@ -304,13 +306,14 @@ def replace_keys(value, replacements: dict[str, str]):
     """
     Replace keys in a string with their corresponding values.
 
-    Supports the placeholder style {key}. As a fallback, also supports raw key
-    replacement for older utilities that may pass unbraced tokens.
+    Supports the placeholder styles {key} and $key. Raw word replacement is
+    intentionally avoided because keys such as "hazard" and "model" can also
+    appear as normal path names.
     """
     if isinstance(value, str):
         for key, replacement in replacements.items():
             value = value.replace(f"{{{key}}}", str(replacement))
-            value = value.replace(key, str(replacement))
+            value = value.replace(f"${key}", str(replacement))
     return value
 
 
@@ -369,3 +372,41 @@ def gunzip_file(gz_file_path: str, output_file_path: str) -> None:
     with gzip.open(gz_file_path, "rb") as f_in:
         with open(output_file_path, "wb") as f_out:
             shutil.copyfileobj(f_in, f_out)
+
+
+class _SafeFormatDict(dict):
+    """Preserve placeholders that are not part of the current replacement set."""
+
+    def __missing__(self, key):
+        return "{" + key + "}"
+
+
+def format_time_dependent_paths(value, date_time: dt.datetime, templates: dict | None = None):
+    """
+    Recursively format path-like settings with named time tokens and strftime.
+
+    Named placeholders listed in ``templates`` are replaced first. Unknown
+    placeholders, such as ``{step}`` or ``{return_period}``, are preserved for
+    later processing. Standard ``strftime`` directives are then evaluated.
+
+    Existing path-formatting helpers are unchanged; this function is opt-in.
+
+    :param value: String, dictionary, list, or scalar to format.
+    :param date_time: Datetime used for all time substitutions.
+    :param templates: Optional mapping from placeholder name to strftime pattern.
+    :return: A formatted object with the same structure as ``value``.
+    """
+    templates = templates or {}
+    tokens = {key: date_time.strftime(pattern) for key, pattern in templates.items()}
+
+    if isinstance(value, str):
+        named_formatted = value.format_map(_SafeFormatDict(tokens))
+        return date_time.strftime(named_formatted)
+    if isinstance(value, dict):
+        return {
+            key: format_time_dependent_paths(item, date_time, templates)
+            for key, item in value.items()
+        }
+    if isinstance(value, list):
+        return [format_time_dependent_paths(item, date_time, templates) for item in value]
+    return value

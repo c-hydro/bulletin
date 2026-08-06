@@ -1,0 +1,137 @@
+{
+  "flags": {
+    "debug": false,
+    "run_hazard_classification": true,
+    "run_spatial_aggregation": true,
+    "run_multimodel_merger": true,
+    "hazard_assessment": true,
+    "impact_assessment": true,
+    "save_ancillary": true,
+    "mask_sea": false,
+    "clear_ancillary": false
+  },
+  "settings": {
+    "domain": "example_domain",
+    "forecast_length_h": 240,
+    "forecast_resolution_h": 1,
+    "rain_window_h": 24,
+    "min_warning_pixel": 1,
+    "hazards": ["rain", "wind"],
+    "hazards_short": ["rain", "wind"],
+    "bbox": {
+      "lon_left": 20.0,
+      "lon_right": 52.0,
+      "lat_bottom": -35.0,
+      "lat_top": 15.0
+    },
+    "template": {
+      "yyyy": "%Y",
+      "mm": "%m",
+      "dd": "%d",
+      "hh": "%H"
+    }
+  },
+  "input": {
+    "models": {
+      "gfs": {
+        "weight": 0.25,
+        "source": "local",
+        "variables": {
+          "rain": {
+            "name": "tp",
+            "file": "/path/to/{domain}/forecast/%Y/%m/%d/%H/gfs_rain.nc",
+            "accumulated": false
+          },
+          "u-wind": {
+            "name": "u10",
+            "file": "/path/to/{domain}/forecast/%Y/%m/%d/%H/gfs_u10.nc"
+          },
+          "v-wind": {
+            "name": "v10",
+            "file": "/path/to/{domain}/forecast/%Y/%m/%d/%H/gfs_v10.nc"
+          }
+        }
+      },
+      "ecmwf": {
+        "weight": 0.75,
+        "source": "local",
+        "variables": {
+          "rain": {
+            "name": "tp",
+            "file": "/path/to/{domain}/forecast/%Y/%m/%d/%H/ecmwf_rain.nc",
+            "accumulated": true
+          },
+          "u-wind": {
+            "name": "u10",
+            "file": "/path/to/{domain}/forecast/%Y/%m/%d/%H/ecmwf_u10.nc"
+          },
+          "v-wind": {
+            "name": "v10",
+            "file": "/path/to/{domain}/forecast/%Y/%m/%d/%H/ecmwf_v10.nc"
+          }
+        }
+      }
+    }
+  },
+  "static_data": {
+    "warning_regions": "/path/to/{domain}/static/admin/warning_regions.shp",
+    "sea_mask": "/path/to/{domain}/static/masks/sea_mask.tif",
+    "thresholds": {
+      "rain": {
+        "type": "value",
+        "values": [20, 50, 100]
+      },
+      "wind": {
+        "type": "value",
+        "values": [10, 15, 20]
+      }
+    },
+    "impacts": {
+      "exposed_map": {
+        "population": "/path/to/{domain}/static/exposure/population.tif"
+      },
+      "lack_coping_capacity_col": "lack_cap",
+      "weight_hazard_levels": {
+        "rain": [0.25, 0.50, 1.00],
+        "wind": [0.25, 0.50, 1.00]
+      },
+      "risk_thresholds": {
+        "absolute": [1, 100, 1000, 10000],
+        "relative": [0.0001, 0.001, 0.01, 0.05]
+      }
+    }
+  },
+  "ancillary": {
+    "forecast": {
+      "folder": "/path/to/{domain}/ancillary/meteo/%Y/%m/%d/%H/{model}/",
+      "file_name": "forecast.nc"
+    },
+    "daily_maxima": {
+      "folder": "/path/to/{domain}/ancillary/meteo/%Y/%m/%d/%H/{model}/",
+      "file_name": "daily_maxima.nc"
+    }
+  },
+  "outcome": {
+    "gridded_hazard": {
+      "folder": "/path/to/{domain}/outcome/meteo/hazard/%Y/%m/%d/%H/{model}/",
+      "file_name": "%Y%m%d%H%M_{model}_meteo_alert.nc"
+    },
+    "shape_hazard": {
+      "folder": "/path/to/{domain}/outcome/meteo/hazard_shape/%Y/%m/%d/%H/{model}/",
+      "file_name": "%Y%m%d%H%M_{model}_{hazard}_hazard.shp"
+    },
+    "shape_impacts": {
+      "folder": "/path/to/{domain}/outcome/meteo/impact_shape/%Y/%m/%d/%H/{model}/",
+      "file_name": "%Y%m%d%H%M_{model}_{exposed_element}_{hazard}_impact.shp"
+    }
+  },
+  "merger": {
+    "input_file": "/path/to/{domain}/outcome/meteo/impact_shape/%Y/%m/%d/%H/{model}/%Y%m%d%H%M_{model}_population_{hazard}_impact.shp",
+    "output_file": "/path/to/{domain}/outcome/meteo/impact_shape/%Y/%m/%d/%H/multimodel/%Y%m%d%H%M_multimodel_population_{hazard}_impact.shp",
+    "raise_error_if_missing": false
+  },
+  "log": {
+    "folder": "/path/to/{domain}/logs/meteo/",
+    "file_name": "bulletin_meteo_ibf_%Y%m%d%H%M.txt"
+  }
+}

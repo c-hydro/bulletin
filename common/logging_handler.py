@@ -1,8 +1,47 @@
 import logging
 import tempfile
 import os
-import sys
-from copy import deepcopy
+
+
+DEFAULT_LOG_FORMAT = (
+    "%(asctime)s %(levelname)-8s %(message)-80s "
+    "%(filename)s:[%(lineno)-6s - %(funcName)-20s()]"
+)
+
+
+def summarize_exception(error: Exception) -> str:
+    """Return a compact, single-line exception chain for operational logs."""
+    summaries = []
+    current_error = error
+    visited = set()
+
+    while current_error is not None and id(current_error) not in visited:
+        visited.add(id(current_error))
+        error_type = type(current_error).__name__
+        error_message = " ".join(str(current_error).split())
+        summaries.append(
+            f"{error_type}: {error_message}" if error_message else error_type
+        )
+        current_error = current_error.__cause__ or current_error.__context__
+
+    return " | caused by: ".join(summaries)
+
+
+def log_workflow_exception(workflow_name: str, error: Exception) -> None:
+    """Log a traceback followed by the final one-line ERROR consumed by HAT."""
+    logging.error(
+        " ==> ERROR! %s failed. Full traceback follows.",
+        workflow_name,
+        exc_info=(type(error), error, error.__traceback__),
+        stacklevel=2,
+    )
+    logging.error(
+        " ==> ERROR! %s failed. Last error summary: %s",
+        workflow_name,
+        summarize_exception(error),
+        stacklevel=2,
+    )
+
 
 def reset_logging_stream(logger_name: str) -> None:
     """
@@ -20,10 +59,11 @@ def reset_logging_stream(logger_name: str) -> None:
         logger.setLevel(logging.NOTSET)
         logger.propagate = True
 
+
 def set_logging_stream(
     logger_folder: str = None,
     logger_file: str = None,
-    logger_format: str = "%(asctime)s %(levelname)-8s %(message)-80s %(filename)s:[%(lineno)-6s - %(funcName)-20s()]",
+    logger_format: str = DEFAULT_LOG_FORMAT,
     logger_level: int = logging.INFO,
     logger_name: str = "logger"
     ) -> str:
@@ -40,21 +80,16 @@ def set_logging_stream(
     reset_logging_stream(logger_name=logger_name)
 
     if logger_format is None:
-        logger_format = deepcopy(logger_format)
+        logger_format = DEFAULT_LOG_FORMAT
+    if logger_folder is None:
+        logger_folder = tempfile.gettempdir()
     if logger_file is None:
-        logger_file = deepcopy(logger_file)
-
-    if logger_folder is None or logger_file is None:
-        with tempfile.TemporaryDirectory() as temp_dir:
-            logger_folder = temp_dir
-            logger_file = "temp_log.log"
-            logger_path = os.path.join(logger_folder, logger_file)
-            setup_logging(logger_path, logger_format, logger_level, logger_name)
-            return logger_path
+        logger_file = f"{logger_name}.log"
 
     logger_path = os.path.join(logger_folder, logger_file)
     setup_logging(logger_path, logger_format, logger_level, logger_name)
     return logger_path
+
 
 def setup_logging(logger_path: str, logger_format: str, logger_level: int, logger_name: str) -> None:
     """
@@ -65,32 +100,22 @@ def setup_logging(logger_path: str, logger_format: str, logger_level: int, logge
     :param logger_level: Logging level.
     :param logger_name: Name of the logger.
     """
-    if os.path.exists(logger_path):
-        os.remove(logger_path)
+    logger_path = os.path.abspath(logger_path)
+    os.makedirs(os.path.dirname(logger_path), exist_ok=True)
 
-    logger_loc = os.path.split(logger_path)
-    if logger_loc[0] == '':
-        logger_folder_name, logger_file_name = os.path.dirname(os.path.abspath(sys.argv[0])), logger_loc[1]
-    else:
-        logger_folder_name, logger_file_name = logger_loc[0], logger_loc[1]
-
-    os.makedirs(logger_folder_name, exist_ok=True)
-    logger_path = os.path.join(logger_folder_name, logger_file_name)
-
-    if os.path.exists(logger_path):
-        os.remove(logger_path)
-
-    logging.getLogger(logger_name)
-    logging.root.setLevel(logger_level)
-    logging.basicConfig(level=logger_level, format=logger_format, filename=logger_path, filemode='w')
-
-    logger_handle_1 = logging.FileHandler(logger_path, 'w')
-    logger_handle_2 = logging.StreamHandler()
-    logger_handle_1.setLevel(logger_level)
-    logger_handle_2.setLevel(logger_level)
     logger_formatter = logging.Formatter(logger_format)
-    logger_handle_1.setFormatter(logger_formatter)
-    logger_handle_2.setFormatter(logger_formatter)
+    file_handler = logging.FileHandler(logger_path, mode="w")
+    stream_handler = logging.StreamHandler()
 
-    logging.getLogger('').addHandler(logger_handle_1)
-    logging.getLogger('').addHandler(logger_handle_2)
+    for handler in (file_handler, stream_handler):
+        handler.setLevel(logger_level)
+        handler.setFormatter(logger_formatter)
+
+    root_logger = logging.getLogger()
+    root_logger.setLevel(logger_level)
+    root_logger.addHandler(file_handler)
+    root_logger.addHandler(stream_handler)
+
+    named_logger = logging.getLogger(logger_name)
+    named_logger.setLevel(logger_level)
+    named_logger.propagate = True

@@ -1,0 +1,56 @@
+{
+    "settings": {
+        "domain": "africa",
+        "operation": "weighted_flood_overlay"
+    },
+    "flags": {
+        "debug": false
+    },
+    "template": {
+        "input_sub_path_time": "%Y/%m/%d",
+        "outcome_datetime": "%Y%m%d%H%M",
+        "outcome_sub_path_time": "%Y/%m/%d"
+    },
+    "input": {
+        "weighted_flood_map": "/share/fp/AMHEWAS/data/data_dynamic/ancillary/continental_watch/glofas/{input_sub_path_time}/0000/flood_maps/weight_map_merged.tif"
+    },
+    "static_data": {
+        "warning_regions": "/home/fp/share/AMHEWAS/data/data_static/admin/adm_2_eccas.shp",
+        "impacts": {
+            "exposed_map": "/home/fp/share/AMHEWAS/data/data_static/exposure/GHS_POP_E2025_africa_wgs84.tif",
+            "lack_coping_capacity_col": "LACK_CC",
+            "risk_thresholds": {
+                "absolute": [
+                    10,
+                    500,
+                    10000,
+                    50000
+                ],
+                "relative": [
+                    null,
+                    null,
+                    0.005,
+                    0.05
+                ]
+            },
+            "hazard_prefix": "GLfl",
+            "progress_every": 25
+        }
+    },
+    "outcome": {
+        "impact_shapefile": {
+            "folder": "/share/fp/AMHEWAS/archive/regional_watch_eccas/hydro/{outcome_sub_path_time}/",
+            "file_name": "{outcome_datetime}_glofas-ECCAS.shp",
+            "rename_columns": {
+                "pop_total": "stock",
+                "GLflAffPpl": "flood_tot",
+                "GLflAffPrc": "flood_perc",
+                "GLfl_level": "flood_leve"
+            }
+        }
+    },
+    "log": {
+        "folder": "/share/fp/AMHEWAS/log/tools_regional_watch_eccas/hydro/",
+        "file_name": "regional_watch_eccas_hydro_{outcome_datetime}.txt"
+    }
+}
