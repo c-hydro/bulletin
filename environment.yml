@@ -1,0 +1,20 @@
+name: env_amhewas
+channels:
+  - conda-forge
+dependencies:
+  - python=3.10
+  - affine>=2.4,<3
+  - dask>=2025.1
+  - geopandas>=1.0,<2
+  - netcdf4>=1.7,<2
+  - numpy>=2.0,<3
+  - pandas>=2.2,<3
+  - pytz>=2024.1
+  - rasterio>=1.4,<2
+  - rioxarray>=0.18,<0.21
+  - scipy>=1.14,<2
+  - shapely>=2.0,<3
+  - xarray>=2025.1
+  - pip
+  - pip:
+      - lmoments3 @ git+https://github.com/Ouranosinc/lmoments3.git@v1.0.6

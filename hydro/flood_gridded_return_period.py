@@ -3,6 +3,8 @@ import logging
 import os
 import pandas as pd
 import datetime as dt
+import xarray as xr
+import rioxarray as rx
 from common.io_handler import IOHandler, format_path_with_time
 from common.evd import get_distribution
 from common.hydro_tools import HydroTools
@@ -194,3 +196,154 @@ class CalculateFloodReturnPeriod:
 
         IOHandler.clear_ancillary_folder(self.ancillary_folder, self.clear_ancillary_flag)
         return format_path_with_time(os.path.join(self.outcome_folder, self.outcome_filename), date_now)
+
+
+class CalculateFloodThresholdLevels:
+    """
+    Classify GLOFAS discharge forecasts against the static return-period maps.
+
+    The implementation intentionally reproduces the operational reference
+    ``bulletin_hydro_glofas.py``. Forecast download and ensemble averaging are
+    external to this processor; only the classification logic is retained here.
+    """
+
+    def __init__(
+        self,
+        forecast_template: str,
+        time_steps: list[str],
+        area_file: str,
+        discharge_thresholds: dict,
+        thresholds: dict,
+        variable_name: str = "dis24",
+    ):
+        self.forecast_template = forecast_template
+        self.time_steps = time_steps
+        self.area_file = area_file
+        self.discharge_thresholds = discharge_thresholds
+        self.thresholds = thresholds
+        self.variable_name = variable_name
+
+    def _read_forecast(self, step: str) -> xr.DataArray:
+        """Read one externally prepared GLOFAS mean-forecast field."""
+        forecast_file = self.forecast_template.format(step=step)
+        if not os.path.isfile(forecast_file):
+            raise FileNotFoundError(
+                "required GLOFAS average forecast not found for lead time "
+                f"{step}; the downloader/averaging process may be incomplete or the "
+                f"requested run may not be available yet. File: {forecast_file}"
+            )
+
+        with xr.open_dataset(forecast_file) as dataset:
+            if self.variable_name not in dataset:
+                raise KeyError(
+                    f"Variable '{self.variable_name}' not found in forecast file: "
+                    f"{forecast_file}"
+                )
+            forecast = dataset[self.variable_name].squeeze().load()
+
+        if "lon" not in forecast.coords or "lat" not in forecast.coords:
+            raise ValueError(
+                f"Forecast coordinates 'lon' and 'lat' not found in: {forecast_file}"
+            )
+        return forecast
+
+    def run(self) -> xr.DataArray:
+        """
+        Return the maximum raw GLOFAS threshold class over all lead times.
+
+        This follows the operational reference literally:
+        - area and threshold rasters are reindexed with xarray ``nearest``;
+        - thresholds are reopened and reindexed for every lead time;
+        - ``alert_map`` and ``alert_max`` start from class 1;
+        - ``alert_map`` is retained between lead times.
+        """
+        logging.info("Classifying GLOFAS discharge against threshold maps")
+
+        first_step = True
+        alert_level_days = {}
+        alert_map = None
+        alert_max = None
+        discharge = None
+
+        threshold_template = os.path.join(
+            self.discharge_thresholds["folder"],
+            self.discharge_thresholds["file_name"],
+        )
+
+        for step in self.time_steps:
+            logging.info(f"Analysing discharge lead time {step}")
+            discharge = self._read_forecast(step)
+
+            if first_step:
+                area = (
+                    rx.open_rasterio(self.area_file)
+                    .reindex(
+                        {
+                            "x": discharge.lon.values,
+                            "y": discharge.lat.values,
+                        },
+                        method="nearest",
+                    )
+                    .squeeze()
+                )
+                area_mask = np.where(
+                    area >= self.thresholds["area_km2"],
+                    1,
+                    0,
+                )
+                alert_map = np.ones(area.shape)
+                alert_max = np.ones(area.shape)
+                first_step = False
+
+            for level, return_period in enumerate(
+                self.discharge_thresholds["return_periods"],
+                start=2,
+            ):
+                threshold_file = threshold_template.format(
+                    domain=None,
+                    return_period=return_period,
+                )
+                threshold_map = (
+                    rx.open_rasterio(threshold_file)
+                    .reindex(
+                        {
+                            "x": discharge.lon.values,
+                            "y": discharge.lat.values,
+                        },
+                        method="nearest",
+                    )
+                    .squeeze()
+                )
+                threshold_map.values[threshold_map.values <= 0] = np.inf
+
+                alert_map = np.where(
+                    (discharge.values >= threshold_map.values)
+                    & (discharge.values >= self.thresholds["discharge_min"]),
+                    level,
+                    alert_map,
+                )
+
+            alert_level_days[step] = np.where(area_mask == 1, alert_map, 0)
+            alert_max = np.maximum(alert_max, alert_level_days[step])
+
+        if discharge is None or alert_max is None:
+            raise ValueError("No GLOFAS discharge time steps were configured.")
+
+        classes, counts = np.unique(alert_max, return_counts=True)
+        logging.info(
+            "Final raw GLOFAS class counts: %s",
+            ", ".join(
+                f"{int(value)}={int(count)}"
+                for value, count in zip(classes, counts)
+            ),
+        )
+
+        return xr.DataArray(
+            alert_max,
+            dims=["lat", "lon"],
+            coords={
+                "lon": discharge.lon.values,
+                "lat": discharge.lat.values,
+            },
+            name="flood",
+        )

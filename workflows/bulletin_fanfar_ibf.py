@@ -7,7 +7,7 @@ import os
 import pandas as pd
 import geopandas as gpd
 from common.settings import Settings
-from common.logging_handler import set_logging_stream
+from common.logging_handler import log_workflow_exception, set_logging_stream
 from hydro.flood_df_return_period import CalculateFloodReturnPeriod
 from hydro.flood_hazard_mapping import FloodHazardMerge
 from hydro.flood_impact_assessment import ImpactAssessment, initialize_subdomain_inputs
@@ -136,4 +136,8 @@ if __name__ == "__main__":
     parser.add_argument('-time', required=True, help='Algorithm time in "YYYY-MM-DD HH:MM" format')
     parser.add_argument('-domain', required=False, help='Domain to use, overrides settings file')
     args = parser.parse_args()
-    main(args.settings_file, args.time, args.domain)
+    try:
+        main(args.settings_file, args.time, args.domain)
+    except Exception as exc:
+        log_workflow_exception("FANFAR IBF workflow", exc)
+        raise SystemExit(1)

@@ -1,7 +1,13 @@
 import os
 import logging
+import time
+import warnings
+
+import numpy as np
+import rioxarray as rx
 import pandas as pd
 import geopandas as gpd
+from common.grids_handler import GridsHandler
 from common.io_handler import update_file_paths
 
 class ImpactAssessment:
@@ -117,6 +123,179 @@ class ImpactAssessment:
             self.process_impact_files(rp, filtered_hydro_to_admin, impacts_table, impact_files, apply_defense)
 
         return impacts_table
+
+
+    @staticmethod
+    def _assign_overlay_risk(
+        value_rel: float,
+        value_abs: float,
+        risk_thresholds: dict,
+    ) -> int:
+        """Classify an impact using paired absolute and relative thresholds."""
+        risk = 0
+        for risk_level, (risk_th_abs, risk_th_rel) in enumerate(
+            zip(risk_thresholds["absolute"], risk_thresholds["relative"]),
+            start=1,
+        ):
+            risk_th_abs = 0 if risk_th_abs is None else risk_th_abs
+            risk_th_rel = 0 if risk_th_rel is None else risk_th_rel
+            if risk_th_abs == 0 and risk_th_rel == 0:
+                raise ValueError(
+                    f"Both absolute and relative thresholds are none for class {risk_level}"
+                )
+            if value_rel >= risk_th_rel and value_abs >= risk_th_abs:
+                risk = risk_level
+            else:
+                break
+        return risk
+
+    def empty_overlay(self, hazard: str = "flood") -> gpd.GeoDataFrame:
+        """Return a zero-impact administrative layer for an empty flood mosaic."""
+        output = self.admin_shape.copy()
+        output["pop_total"] = 0.0
+        output[hazard + "AffPpl"] = 0.0
+        output[hazard + "AffPrc"] = 0.0
+        output[hazard + "_level"] = 0.0
+        return output
+
+    def run_overlay(
+        self,
+        weighted_flood_map: str,
+        impact_settings: dict,
+        hazard: str = "flood",
+    ) -> gpd.GeoDataFrame:
+        """
+        Calculate impacts by overlaying a weighted flood raster and exposure.
+
+        This method is an opt-in alternative to ``run``, which keeps the
+        established MUL-based behavior unchanged for all existing workflows.
+
+        :param weighted_flood_map: Hazard-weighted flood mosaic.
+        :param impact_settings: Exposure, vulnerability, and risk settings.
+        :param hazard: Prefix used for output columns.
+        :return: Administrative GeoDataFrame containing overlay impacts.
+        """
+        logging.info("Calculate impacts from raster overlay...")
+        output = self.admin_shape.copy()
+        output["pop_total"] = -9999.0
+        output[hazard + "AffPpl"] = -9999.0
+        output[hazard + "AffPrc"] = -9999.0
+        output[hazard + "_level"] = -9999.0
+
+        zone_count = len(output)
+        progress_every = max(1, int(impact_settings.get("progress_every", 25)))
+        started = time.perf_counter()
+
+        logging.info(
+            "Looping through %s impact zones for %s risk",
+            zone_count,
+            hazard,
+        )
+
+        # Keep both large rasters open, but continue reading only the bounding
+        # box of the current administrative zone. This reduces repeated file
+        # opening without loading the full rasters into memory.
+        flood_raster = rx.open_rasterio(weighted_flood_map, cache=False)
+        exposure_raster = rx.open_rasterio(
+            impact_settings["exposed_map"],
+            cache=False,
+        )
+
+        try:
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", category=RuntimeWarning)
+                for position, (index, row) in enumerate(output.iterrows(), start=1):
+                    minx, miny, maxx, maxy = row.geometry.bounds
+                    try:
+                        clipped_flood = flood_raster.rio.clip_box(
+                            minx=minx,
+                            miny=miny,
+                            maxx=maxx,
+                            maxy=maxy,
+                        ).squeeze()
+                        clipped_exposure = exposure_raster.rio.clip_box(
+                            minx=minx,
+                            miny=miny,
+                            maxx=maxx,
+                            maxy=maxy,
+                        ).squeeze()
+                    except rx.exceptions.NoDataInBounds:
+                        output.at[index, hazard + "_level"] = 0
+                        output.at[index, hazard + "AffPpl"] = 0
+                        output.at[index, hazard + "AffPrc"] = 0
+                        output.at[index, "pop_total"] = 0
+                    else:
+                        clipped_exposure.values = np.where(
+                            clipped_exposure.values < 0,
+                            0,
+                            clipped_exposure.values,
+                        )
+                        lon_bbox = clipped_exposure.x.values
+                        lat_bbox = clipped_exposure.y.values
+                        alert_bbox = clipped_flood.reindex(
+                            {"x": lon_bbox, "y": lat_bbox},
+                            method="nearest",
+                        )
+                        admin_mask = GridsHandler.rasterize_shapes(
+                            [(row.geometry, 1)],
+                            {"lon": lon_bbox, "lat": lat_bbox},
+                        )
+
+                        weight_map = np.where(
+                            admin_mask == 1,
+                            alert_bbox.values / 100,
+                            np.nan,
+                        )
+                        lack_capacity = (
+                            row[impact_settings["lack_coping_capacity_col"]] / 10
+                        )
+                        affected = np.nansum(
+                            weight_map
+                            * np.squeeze(clipped_exposure.values)
+                            * lack_capacity
+                        )
+                        total = np.nansum(
+                            np.where(
+                                admin_mask == 1,
+                                np.squeeze(clipped_exposure.values),
+                                np.nan,
+                            )
+                        )
+                        affected_rate = 0 if total == 0 else affected / total
+                        risk = self._assign_overlay_risk(
+                            affected_rate,
+                            affected,
+                            impact_settings["risk_thresholds"],
+                        )
+
+                        output.at[index, hazard + "_level"] = risk
+                        output.at[index, hazard + "AffPpl"] = affected
+                        output.at[index, hazard + "AffPrc"] = affected_rate
+                        output.at[index, "pop_total"] = total
+
+                    if (
+                        position == 1
+                        or position % progress_every == 0
+                        or position == zone_count
+                    ):
+                        elapsed = time.perf_counter() - started
+                        rate = position / elapsed if elapsed > 0 else 0.0
+                        remaining = (
+                            (zone_count - position) / rate if rate > 0 else 0.0
+                        )
+                        logging.info(
+                            "Computed impact zone %s of %s "
+                            "[%.1f zones/s, ETA %.1f s]",
+                            position,
+                            zone_count,
+                            rate,
+                            remaining,
+                        )
+        finally:
+            flood_raster.close()
+            exposure_raster.close()
+
+        return output
 
 def initialize_subdomain_inputs(domain: str, subdomain: str, domain_shape: gpd.GeoDataFrame, mul_files: dict, hydro_to_admin_table: dict) -> tuple[pd.DataFrame, dict]:
     """
