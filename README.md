@@ -1,6 +1,6 @@
 # BULLETIN
 
-BULLETIN is a Python toolbox for operational impact-based forecasting of natural hazards. The current repository supports meteorological hazards, river flooding, and pluvial flooding by combining forecast data, hazard thresholds, exposure information, and precomputed impact or flood-map datasets.
+BULLETIN (Boîte à oUtils opérationneLLe pour la prÉvision des impacTs des rIsques Naturels) is a Python toolbox for operational impact-based forecasting of natural hazards. The current repository supports meteorological hazards, river flooding, and pluvial flooding by combining forecast data, hazard thresholds, exposure information, and precomputed impact or flood-map datasets.
 
 ## Workflow overview
 
