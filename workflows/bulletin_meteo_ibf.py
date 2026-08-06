@@ -6,7 +6,11 @@ import time
 import warnings
 
 from common.settings import Settings
-from common.logging_handler import set_logging_stream, reset_logging_stream
+from common.logging_handler import (
+    log_workflow_exception,
+    reset_logging_stream,
+    set_logging_stream,
+)
 from common.io_handler import IOHandler, format_path_with_time, update_file_paths
 from common.time_handler import parse_algorithm_time, build_time_tokens
 from meteo.meteo_hazard import MeteoVariable, MeteoForecastInput, MeteoHazardAssessment
@@ -381,8 +385,20 @@ def run_spatial_aggregation(settings: dict, date_now: dt.datetime, alert_daily, 
     if is_enabled(flags, "impact_assessment", True):
         impact_out = outcome_cfg["shape_impacts"]
         impact_settings = static_cfg["impacts"]
+        progress_every = int(set_cfg.get("impact_progress_every", 25))
+
         for exposed_element in impact_settings["exposed_map"].keys():
-            for hazard, hazard_short in zip(hazards, hazards_short):
+            impact_outputs = impact_handler.classify_warning_levels_impact_based_multi_hazard(
+                hazards=hazards,
+                hazards_short=hazards_short,
+                admin_gdf=admin_gdf,
+                alert_daily=alert_daily,
+                impact_settings=impact_settings,
+                exposed_element=exposed_element,
+                progress_every=progress_every,
+            )
+
+            for hazard in hazards:
                 out_path = format_path_with_time(
                     update_file_paths(
                         os.path.join(impact_out["folder"], impact_out["file_name"]),
@@ -394,20 +410,12 @@ def run_spatial_aggregation(settings: dict, date_now: dt.datetime, alert_daily, 
                     ),
                     date_now,
                 )
-                out_gdf = impact_handler.classify_warning_levels_impact_based(
-                    hazard=hazard,
-                    hazard_short=hazard_short,
-                    admin_gdf=admin_gdf,
-                    alert_daily=alert_daily,
-                    impact_settings=impact_settings,
-                    exposed_element=exposed_element,
-                )
-                impact_handler.save(out_gdf, out_path)
+                impact_handler.save(impact_outputs[hazard], out_path)
 
 
 def run_multimodel_merger(settings: dict, date_now: dt.datetime, model_names: list[str]) -> bool:
     """
-    Merge impact outputs produced for the selected complete models.
+    Merge impact outputs produced by the selected models.
 
     Returns True when the merger ran successfully, False when it was skipped.
     """
@@ -417,7 +425,7 @@ def run_multimodel_merger(settings: dict, date_now: dt.datetime, model_names: li
         return False
 
     if not model_names:
-        logging.info("No complete model selected. Skipping multimodel merger.")
+        logging.info("No model selected. Skipping multimodel merger.")
         return False
 
     merger_cfg = settings.get("merger")
@@ -482,6 +490,7 @@ def main(
     try:
         completed_models = []
         failed_models = []
+        failed_model_errors = {}
         new_outputs_created = False
         skip_missing = is_enabled(settings.get("flags", {}), "skip_missing_models", False)
         rerun_models_flag = is_enabled(settings.get("flags", {}), "rerun_models", True)
@@ -497,6 +506,7 @@ def main(
 
             if final:
                 failed_models.append(model_name)
+                failed_model_errors[model_name] = "final model output is incomplete"
                 logging.info(f"Final mode: model '{model_name}' is not complete and will not be processed.")
                 continue
 
@@ -530,6 +540,7 @@ def main(
 
             except Exception as exc:
                 failed_models.append(model_name)
+                failed_model_errors[model_name] = str(exc) or exc.__class__.__name__
                 if skip_missing:
                     logging.warning(f"Skipping model '{model_name}' due to error: {exc}")
                     continue
@@ -550,6 +561,29 @@ def main(
                 + ", ".join(failed_models)
             )
 
+        merger_cfg = settings.get("merger", {})
+        merger_raise_if_missing = bool(merger_cfg.get("raise_error_if_missing", False))
+
+        # In strict merger mode, stop before opening any shapefile and report all
+        # missing/failed models together. This gives a clear operational error
+        # instead of a generic FileNotFoundError for the first missing file.
+        if merger_raise_if_missing and failed_models:
+            missing_details = "; ".join(
+                f"{model_name}: {failed_model_errors.get(model_name, 'required output is missing')}"
+                for model_name in failed_models
+            )
+            raise RuntimeError(
+                "Multimodel merger cannot run. Missing/failed required models: "
+                f"{missing_details}. Wait for the missing models or rerun using settings with "
+                "merger.raise_error_if_missing=false to merge only complete models."
+            )
+
+        merger_models = model_names if merger_raise_if_missing else completed_models
+        logging.info(
+            "Merger model policy: "
+            + ("all configured models" if merger_raise_if_missing else "complete models only")
+        )
+
         merger_outputs_complete = are_outputs_complete(build_merger_output_paths(settings, date_now))
         run_merger = True
         if merger_outputs_complete and not new_outputs_created and not final:
@@ -559,7 +593,7 @@ def main(
 
         merger_ran = False
         if run_merger:
-            merger_ran = run_multimodel_merger(settings, date_now, completed_models)
+            merger_ran = run_multimodel_merger(settings, date_now, merger_models)
 
         if final and not merger_ran and not merger_outputs_complete:
             raise RuntimeError("Final mode requested but no merged output was produced.")
@@ -571,6 +605,9 @@ def main(
         logging.info(" ==> ... END")
         logging.info(" ==> Bye, Bye")
         logging.info(" ============================================================================ ")
+    except Exception as exc:
+        log_workflow_exception("Meteo IBF workflow", exc)
+        raise SystemExit(1)
     finally:
         reset_logging_stream("logger")
 
